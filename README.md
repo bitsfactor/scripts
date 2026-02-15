@@ -2,13 +2,13 @@
 
 Quick bootstrap scripts for local and remote VPS environment setup.
 
-> **🔑 Key Concept:**
-> * **Public Key (`.pub`):** Add this to your [GitHub SSH Settings](https://github.com/settings/keys).
-> * **Private Key:** Keep this secret. You will paste this into your VPS.
+> **🔑 Architecture Concept:**
+> * **Configure Once:** Add the generated **Public Key** (`.pub`) to your [GitHub SSH Settings](https://github.com/settings/keys) exactly once.
+> * **Sync Everywhere:** Use the exact same **Private Key** across all your devices and VPS instances to instantly grant them identical GitHub access permissions.
 
-## 1. Local Machine: Get Keys
+## 1. Local Machine: Retrieve Keys
 
-Run this on your local machine (e.g., Mac). It will automatically copy the **Private Key** to your clipboard and display the **Public Key** for GitHub:
+Run this on your local machine (e.g., Mac) to get your SSH key pair:
 
 ```bash
 bash <(curl -s [https://raw.githubusercontent.com/bitsfactor/scripts/main/git/get-key.sh](https://raw.githubusercontent.com/bitsfactor/scripts/main/git/get-key.sh))
@@ -16,7 +16,7 @@ bash <(curl -s [https://raw.githubusercontent.com/bitsfactor/scripts/main/git/ge
 
 ## 2. Remote Server: Init GitHub Auth
 
-Run this on your newly provisioned VPS, then paste your **Private Key** when prompted to instantly configure GitHub access:
+Run this on any newly provisioned VPS, then paste your **Private Key** when prompted:
 
 ```bash
 bash <(curl -s [https://raw.githubusercontent.com/bitsfactor/scripts/main/git/init.sh](https://raw.githubusercontent.com/bitsfactor/scripts/main/git/init.sh))
