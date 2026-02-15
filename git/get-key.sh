@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 定义颜色输出
+# Define color output
 GREEN='\033[32m'
 RED='\033[31m'
 YELLOW='\033[33m'
@@ -8,46 +8,46 @@ BLUE='\033[34m'
 CYAN='\033[36m'
 NC='\033[0m'
 
-echo -e "${BLUE}[Retrieve] 正在检查本地 SSH 密钥...${NC}"
+echo -e "${BLUE}[Retrieve] Checking local SSH keys...${NC}"
 
-# 1. 自动探测或询问生成密钥
+# 1. Auto-detect or prompt to generate key
 KEY_FILE=""
 if [ -f "$HOME/.ssh/id_ed25519" ]; then
     KEY_FILE="$HOME/.ssh/id_ed25519"
-    echo -e "发现现有 ed25519 密钥: ${YELLOW}$KEY_FILE${NC}"
+    echo -e "Found existing ed25519 key: ${YELLOW}$KEY_FILE${NC}"
 elif [ -f "$HOME/.ssh/id_rsa" ]; then
     KEY_FILE="$HOME/.ssh/id_rsa"
-    echo -e "发现现有 rsa 密钥: ${YELLOW}$KEY_FILE${NC}"
+    echo -e "Found existing rsa key: ${YELLOW}$KEY_FILE${NC}"
 else
-    echo -e "${YELLOW}[Notice] 未检测到 SSH 密钥。${NC}"
-    read -p "❓ 是否自动为你生成最安全的 ed25519 密钥？(y/n): " confirm
+    echo -e "${YELLOW}[Notice] No SSH key detected.${NC}"
+    read -p "❓ Would you like to automatically generate a secure ed25519 key? (y/n): " confirm
     
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         KEY_FILE="$HOME/.ssh/id_ed25519"
         DEFAULT_EMAIL="$(whoami)@$(hostname)"
         
-        echo -e "${BLUE}正在静默生成...${NC}"
+        echo -e "${BLUE}Generating silently...${NC}"
         ssh-keygen -t ed25519 -C "$DEFAULT_EMAIL" -f "$KEY_FILE" -N "" > /dev/null 2>&1
-        echo -e "${GREEN}[Success] 全新密钥对已生成！${NC}"
+        echo -e "${GREEN}[Success] New key pair generated successfully!${NC}"
     else
-        echo -e "${RED}[Cancelled] 已取消生成。脚本安全退出。${NC}"
+        echo -e "${RED}[Cancelled] Generation cancelled. Exiting safely.${NC}"
         exit 1
     fi
 fi
 
-# 2. 在屏幕上清晰打印公钥 (Public Key)
-echo -e "\n${CYAN}================== [ 公钥 Public Key ] ==================${NC}"
-echo -e "${YELLOW}👉 作用: 用于在 GitHub (Settings -> SSH keys) 中添加信任${NC}"
+# 2. Print Public Key clearly on screen
+echo -e "\n${CYAN}==================== [ Public Key ] =====================${NC}"
+echo -e "${YELLOW}👉 Purpose: Add to GitHub (Settings -> SSH and GPG keys)${NC}"
 cat "${KEY_FILE}.pub"
 echo -e "${CYAN}=========================================================${NC}\n"
 
-# 3. 在屏幕上清晰打印私钥 (Private Key)
-echo -e "${CYAN}================== [ 私钥 Private Key ] =================${NC}"
-echo -e "${YELLOW}👉 作用: 用于粘贴到你 VPS 的初始化脚本中${NC}"
+# 3. Print Private Key clearly on screen
+echo -e "${CYAN}==================== [ Private Key ] ====================${NC}"
+echo -e "${YELLOW}👉 Purpose: Paste into your VPS initialization script${NC}"
 cat "${KEY_FILE}"
 echo -e "${CYAN}=========================================================${NC}\n"
 
-# 4. 自动探测剪贴板命令 (兼容 macOS/Linux/Windows)
+# 4. Auto-detect clipboard command (compatible with macOS/Linux/Windows)
 CLIP_CMD=""
 if command -v pbcopy &> /dev/null; then
     CLIP_CMD="pbcopy"
@@ -59,11 +59,11 @@ elif command -v clip.exe &> /dev/null; then
     CLIP_CMD="clip.exe"
 fi
 
-# 5. 将【私钥】默认写入剪贴板 (为了最高效的 VPS 部署)
+# 5. Copy [Private Key] to clipboard by default
 if [ -n "$CLIP_CMD" ]; then
     cat "$KEY_FILE" | $CLIP_CMD
-    echo -e "${GREEN}[Success] 私钥 (Private Key) 已自动存入你的系统剪贴板！${NC}"
-    echo -e "👉 接下来，请登录你的 VPS 并运行远端初始化脚本。遇到提示时直接按下 Command+V 粘贴即可。"
+    echo -e "${GREEN}[Success] Private Key automatically copied to your system clipboard!${NC}"
+    echo -e "👉 Next, log into your VPS and run the remote init script. Press Cmd+V (or Ctrl+V) to paste when prompted."
 else
-    echo -e "${YELLOW}[Warning] 未检测到系统剪贴板工具，请手动复制上方的私钥内容。${NC}"
+    echo -e "${YELLOW}[Warning] No system clipboard tool detected. Please manually copy the Private Key above.${NC}"
 fi
