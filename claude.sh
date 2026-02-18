@@ -6,8 +6,8 @@
 # 支持 macOS 和 Linux（Debian / Ubuntu）
 #
 # 使用方式:
-#   bash claude/setup.sh
-#   curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/claude/setup.sh | bash
+#   bash claude.sh
+#   curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/claude.sh | bash
 # =============================================================================
 
 set -e
