@@ -1,13 +1,13 @@
 # BitsFactor Scripts
 
-A collection of bootstrap scripts. Each script runs independently via `curl | bash`.
+A collection of bootstrap scripts for developers. All scripts support **macOS** and **Linux**, and run independently via `curl | bash`.
 
 ## git.sh — SSH Key Manager
 
-One-time setup for GitHub SSH access across all your machines.
+The fastest way to set up GitHub SSH access across all your machines. Designed for solo developers who manage multiple VPS instances — generate a key pair once on your main computer, then share the same private key to every new server. No more repeated key generation or manual config.
 
-- **1) Retrieve Keys** — Run on your local machine. Gets your SSH key pair (or generates one if none exists) and copies the private key to clipboard. Add the public key to [GitHub SSH Settings](https://github.com/settings/keys).
-- **2) Set Key** — Run on a new server or Mac. Paste your private key and the script handles the rest. Once done, you can `git clone` private repos immediately.
+- **1) Retrieve Keys** — Run on your main computer. Gets your SSH key pair (or generates one if none exists) and copies the private key to clipboard. Add the public key to [GitHub SSH Settings](https://github.com/settings/keys) once.
+- **2) Set Key** — Run on any new VPS or Mac. Paste your private key and the script handles the rest. Once done, you can `git clone` private repos immediately.
 
 ```bash
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git.sh | bash
