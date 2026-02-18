@@ -24,7 +24,8 @@ echo -e "${YELLOW}👉 Press [Enter] for a new line, then press [Ctrl+D] to save
 echo -e "${YELLOW}=======================================================${NC}\n"
 
 # Capture multi-line input until Ctrl+D
-cat > ~/.ssh/id_ed25519
+# 使用 /dev/tty 从终端读取，确保 curl | bash 方式运行时也能正常接收输入
+cat /dev/tty > ~/.ssh/id_ed25519
 
 # Step 3: Set strict permissions (Required by SSH)
 echo -e "\n${BLUE}[Step 3/4] Applying strict permissions (600)...${NC}"
