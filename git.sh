@@ -108,6 +108,16 @@ do_set_key() {
     echo -e "${YELLOW}Press [Enter] for a new line, then press [Ctrl+D] to save.${NC}"
     echo -e "${YELLOW}=======================================================${NC}\n"
 
+    # Warn if key already exists
+    if [ -f ~/.ssh/id_ed25519 ]; then
+        echo -e "${YELLOW}[Warning] ~/.ssh/id_ed25519 already exists and will be overwritten.${NC}"
+        read -p "Continue? (y/n): " overwrite_confirm < /dev/tty
+        if [[ ! "$overwrite_confirm" =~ ^[Yy]$ ]]; then
+            echo -e "${RED}[Cancelled] Operation cancelled.${NC}"
+            return
+        fi
+    fi
+
     cat /dev/tty > ~/.ssh/id_ed25519
 
     # Set strict permissions
@@ -121,7 +131,9 @@ do_set_key() {
 
     # Add GitHub to known_hosts
     echo -e "${BLUE}[Step 4/4] Adding GitHub to trusted hosts...${NC}"
-    ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+    if ! grep -q "^github.com " ~/.ssh/known_hosts 2>/dev/null; then
+        ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+    fi
 
     # Verify Connection
     echo -e "${BLUE}Verifying GitHub connection...${NC}"
