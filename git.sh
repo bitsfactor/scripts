@@ -48,6 +48,7 @@ do_get_key() {
 
             echo -e "${BLUE}Generating silently...${NC}"
             mkdir -p "$HOME/.ssh"
+            chmod 700 "$HOME/.ssh"
             ssh-keygen -t ed25519 -C "$DEFAULT_EMAIL" -f "$KEY_FILE" -N "" > /dev/null 2>&1
             echo -e "${GREEN}[Success] New key pair generated successfully!${NC}"
         else
@@ -102,21 +103,21 @@ do_set_key() {
     mkdir -p ~/.ssh
     chmod 700 ~/.ssh
 
-    # Receive the Private Key
-    echo -e "\n${YELLOW}=======================================================${NC}"
-    echo -e "${YELLOW}Please paste your SSH Private Key below.${NC}"
-    echo -e "${YELLOW}Press [Enter] for a new line, then press [Ctrl+D] to save.${NC}"
-    echo -e "${YELLOW}=======================================================${NC}\n"
-
     # Warn if key already exists
     if [ -f ~/.ssh/id_ed25519 ]; then
-        echo -e "${YELLOW}[Warning] ~/.ssh/id_ed25519 already exists and will be overwritten.${NC}"
+        echo -e "\n${YELLOW}[Warning] ~/.ssh/id_ed25519 already exists and will be overwritten.${NC}"
         read -p "Continue? (y/n): " overwrite_confirm < /dev/tty
         if [[ ! "$overwrite_confirm" =~ ^[Yy]$ ]]; then
             echo -e "${RED}[Cancelled] Operation cancelled.${NC}"
             return
         fi
     fi
+
+    # Receive the Private Key
+    echo -e "\n${YELLOW}=======================================================${NC}"
+    echo -e "${YELLOW}Please paste your SSH Private Key below.${NC}"
+    echo -e "${YELLOW}Press [Enter] for a new line, then press [Ctrl+D] to save.${NC}"
+    echo -e "${YELLOW}=======================================================${NC}\n"
 
     cat /dev/tty > ~/.ssh/id_ed25519
 
@@ -126,7 +127,11 @@ do_set_key() {
 
     # Generate matching public key from private key
     echo -e "${BLUE}[Step 3/4] Generating matching public key...${NC}"
-    ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub
+    if ! ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub 2>/dev/null; then
+        echo -e "${RED}[Error] Invalid private key. Please check the key content and try again.${NC}"
+        rm -f ~/.ssh/id_ed25519.pub
+        return 1
+    fi
     chmod 644 ~/.ssh/id_ed25519.pub
 
     # Add GitHub to known_hosts

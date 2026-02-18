@@ -142,7 +142,7 @@ do_install() {
         rm -f "$tmp_installer"
         return 1
     fi
-    bash "$tmp_installer"
+    bash "$tmp_installer" || { rm -f "$tmp_installer"; return 1; }
     rm -f "$tmp_installer"
 
     echo -e "\n${GREEN}[Success] Claude Code installed!${NC}"
