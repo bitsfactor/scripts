@@ -10,8 +10,11 @@ BitsFactor Scripts 是一组 bash 引导脚本，用于本地机器和远程 VPS
 
 ```
 git/
-  get-key.sh   # 本地机器: 检测/生成 SSH 密钥并复制到剪贴板
-  set-key.sh   # 远程 VPS / Mac: 配置 SSH 密钥并完成 GitHub 认证
+  get-key.sh     # 本地机器: 检测/生成 SSH 密钥并复制到剪贴板
+  set-key.sh     # 远程 VPS / Mac: 配置 SSH 密钥并完成 GitHub 认证
+claude/
+  clear.sh       # 清除 Claude Code CLI 所有配置，支持卸载检测
+  set-api.sh     # 配置 Claude Code API（统一写入 ~/.zshrc，清理残留配置）
 ```
 
 项目无构建系统、包管理器或测试框架。脚本为独立的 bash 文件，可直接运行或通过 `curl | bash` 从 GitHub raw URL 远程执行。
@@ -22,10 +25,14 @@ git/
 # 本地执行
 bash git/get-key.sh
 bash git/set-key.sh
+bash claude/clear.sh
+bash claude/set-api.sh
 
 # 远程执行（主要使用方式）
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git/get-key.sh | bash
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git/set-key.sh | bash
+curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/claude/clear.sh | bash
+curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/claude/set-api.sh | bash
 ```
 
 ## 脚本规范
@@ -34,3 +41,4 @@ curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git/set-key.sh
 - 使用 ANSI 颜色编码输出用户提示（蓝色=信息，绿色=成功，黄色=警告，红色=错误）
 - 跨平台剪贴板支持（macOS `pbcopy`、Linux `xclip`/`wl-copy`、Windows `clip.exe`）
 - SSH 密钥类型优先级：ed25519 优先，RSA 作为备选
+- 所有脚本必须同时支持 macOS 和 Linux（尤其是 Debian 和 Ubuntu 系统）
