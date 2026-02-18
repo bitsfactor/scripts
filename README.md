@@ -1,29 +1,25 @@
 # BitsFactor Scripts
 
-Quick bootstrap scripts for local and remote VPS environment setup.
+A collection of bootstrap scripts. Each script runs independently via `curl | bash`.
 
-> **Architecture Concept:**
-> * **Configure Once:** Add the generated **Public Key** (.pub) to your GitHub SSH Settings (github.com/settings/keys) exactly once.
-> * **Sync Everywhere:** Use the exact same **Private Key** across all your devices and VPS instances to instantly grant them identical GitHub access permissions.
+## git.sh — SSH Key Manager
 
-## 1. Git SSH Key Manager
+Manage SSH keys for GitHub authentication across local machines and remote servers. Based on a **"configure once, sync everywhere"** workflow: generate a key pair once, add the public key to GitHub, then distribute the same private key to all your devices.
 
-Interactive menu for SSH key management and GitHub authentication.
-
-- **1) Retrieve Keys** — Detect or generate an SSH key pair on your local machine, copy the private key to clipboard
-- **2) Set Key** — Paste your private key on a remote server or Mac, configure permissions, and verify GitHub connection
+- **1) Retrieve Keys** — Detect an existing SSH key (ed25519 preferred, RSA fallback) or generate a new ed25519 key pair. Prints both keys to the terminal and copies the private key to clipboard.
+- **2) Set Key** — Paste a private key onto a new server or Mac. Sets correct permissions (700/600), regenerates the matching public key, adds GitHub to `known_hosts`, and verifies the connection.
 
 ```bash
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git.sh | bash
 ```
 
-## 2. Claude Code Setup
+## claude.sh — Claude Code Setup
 
-Interactive menu for Claude Code management.
+Install, configure, or uninstall Claude Code on macOS and Linux.
 
-- **1) Install** — Download and install via the official installer
-- **2) Set API** — Configure `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in `~/.zshrc`
-- **3) Uninstall** — Detect install method (npm / Homebrew / other), remove the binary and all config files
+- **1) Install** — Download and run the official installer (`https://claude.ai/install.sh`).
+- **2) Set API** — Prompt for `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`, clean any stale config from shell profiles and `~/.claude/settings.json`, then write a managed block to `~/.zshrc`.
+- **3) Uninstall** — Auto-detect install method (npm / Homebrew / official installer), offer full uninstall or config-only cleanup, remove all related files (`~/.claude/`, `~/.claude.json`, cache, shell env vars), and verify results.
 
 ```bash
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/claude.sh | bash
