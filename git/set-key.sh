@@ -28,11 +28,16 @@ echo -e "${YELLOW}=======================================================${NC}\n
 cat /dev/tty > ~/.ssh/id_ed25519
 
 # Step 3: Set strict permissions (Required by SSH)
-echo -e "\n${BLUE}[Step 3/4] Applying strict permissions (600)...${NC}"
+echo -e "\n${BLUE}[Step 3/5] Applying strict permissions (600)...${NC}"
 chmod 600 ~/.ssh/id_ed25519
 
-# Step 4: Add GitHub to known_hosts to prevent interactive prompts
-echo -e "${BLUE}[Step 4/4] Adding GitHub to trusted hosts...${NC}"
+# Step 4: 从私钥生成对应的公钥，覆盖旧的公钥文件，避免公私钥不匹配
+echo -e "${BLUE}[Step 4/5] Generating matching public key...${NC}"
+ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub
+chmod 644 ~/.ssh/id_ed25519.pub
+
+# Step 5: Add GitHub to known_hosts to prevent interactive prompts
+echo -e "${BLUE}[Step 5/5] Adding GitHub to trusted hosts...${NC}"
 ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
 
 # Step 5: Verify Connection
