@@ -25,20 +25,11 @@ Run this on any newly provisioned VPS or Mac, then paste your **Private Key** wh
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git/set-key.sh | bash
 ```
 
-## 3. Clear Claude Code Settings / 清除 Claude Code 配置
+## 3. Claude Code Setup / Claude Code 设置工具
 
-Run this to completely remove Claude Code CLI configurations, cache, and optionally uninstall the program.
-彻底清除 Claude Code CLI 的所有配置、缓存，并可选择卸载程序。
-
-```bash
-curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/claude/clear.sh | bash
-```
-
-## 4. Set Claude Code API / 配置 Claude Code API
-
-Run this to configure Claude Code API settings. It writes all config to `~/.zshrc` and cleans up stale entries from other locations.
-配置 Claude Code 的 API 设置。将所有配置统一写入 `~/.zshrc`，并清理其他位置的残留配置。
+All-in-one menu for Claude Code: install, configure API, or uninstall.
+Claude Code 三合一工具：安装、配置 API、卸载清理。
 
 ```bash
-curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/claude/set-api.sh | bash
+curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/claude/setup.sh | bash
 ```
