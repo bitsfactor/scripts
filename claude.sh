@@ -167,9 +167,8 @@ do_set_api() {
         return 1
     fi
 
-    echo -e "${CYAN}Enter ANTHROPIC_AUTH_TOKEN (API key, input is hidden):${NC}"
-    read -rs INPUT_TOKEN < /dev/tty
-    echo ""
+    echo -e "${CYAN}Enter ANTHROPIC_AUTH_TOKEN (API key):${NC}"
+    read -r INPUT_TOKEN < /dev/tty
 
     if [ -z "$INPUT_TOKEN" ]; then
         echo -e "${RED}[Error] API key cannot be empty.${NC}"
