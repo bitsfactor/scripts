@@ -11,7 +11,7 @@ Quick bootstrap scripts for local and remote VPS environment setup.
 Run this on your local machine (e.g., Mac) to get your SSH key pair:
 
 ```bash
-curl -s [https://raw.githubusercontent.com/bitsfactor/scripts/main/git/get-key.sh](https://raw.githubusercontent.com/bitsfactor/scripts/main/git/get-key.sh) | bash
+curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git/get-key.sh | bash
 ```
 
 ## 2. Remote Server / Mac: Set SSH Key
@@ -19,5 +19,5 @@ curl -s [https://raw.githubusercontent.com/bitsfactor/scripts/main/git/get-key.s
 Run this on any newly provisioned VPS or Mac, then paste your **Private Key** when prompted:
 
 ```bash
-curl -s [https://raw.githubusercontent.com/bitsfactor/scripts/main/git/set-key.sh](https://raw.githubusercontent.com/bitsfactor/scripts/main/git/set-key.sh) | bash
+curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git/set-key.sh | bash
 ```
