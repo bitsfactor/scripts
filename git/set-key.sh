@@ -38,11 +38,13 @@ ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
 # Step 5: Verify Connection
 echo -e "${BLUE}🔗 Verifying GitHub connection...${NC}"
 
-# Use ssh -T to test connection; grep to check for success message
-if ssh -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+# 捕获 ssh 输出，用于判断和展示
+SSH_OUTPUT=$(ssh -T git@github.com 2>&1 || true)
+
+if echo "$SSH_OUTPUT" | grep -q "successfully authenticated"; then
     echo -e "${GREEN}[Success] GitHub authentication is configured perfectly!${NC}"
     echo -e "${GREEN}🎉 You can now securely 'git clone' your private repositories.${NC}"
 else
-    echo -e "${RED}[Warning] The verification message was not completely clear, but the key is saved.${NC}"
-    echo -e "${RED}Please try running a 'git clone' command to test the connection manually.${NC}"
+    echo -e "${RED}[Warning] GitHub verification failed. SSH response:${NC}"
+    echo -e "${YELLOW}${SSH_OUTPUT}${NC}"
 fi
