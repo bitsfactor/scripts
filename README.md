@@ -24,7 +24,11 @@ curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git/set-key.sh
 
 ## 3. Claude Code Setup
 
-All-in-one menu for Claude Code: install, configure API, or uninstall.
+All-in-one interactive menu for Claude Code management.
+
+- **1) Install** — Download and install via the official installer
+- **2) Set API** — Configure `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in `~/.zshrc`
+- **3) Uninstall** — Detect install method (npm / Homebrew / other), remove the binary and all config files
 
 ```bash
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/claude/setup.sh | bash
