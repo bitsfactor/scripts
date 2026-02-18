@@ -4,10 +4,10 @@ A collection of bootstrap scripts. Each script runs independently via `curl | ba
 
 ## git.sh — SSH Key Manager
 
-Manage SSH keys for GitHub authentication across local machines and remote servers. Based on a **"configure once, sync everywhere"** workflow: generate a key pair once, add the public key to GitHub, then distribute the same private key to all your devices.
+One-time setup for GitHub SSH access across all your machines.
 
-- **1) Retrieve Keys** — Detect an existing SSH key (ed25519 preferred, RSA fallback) or generate a new ed25519 key pair. Prints both keys to the terminal and copies the private key to clipboard.
-- **2) Set Key** — Paste a private key onto a new server or Mac. Sets correct permissions (700/600), regenerates the matching public key, adds GitHub to `known_hosts`, and verifies the connection.
+- **1) Retrieve Keys** — Run on your local machine. Gets your SSH key pair (or generates one if none exists) and copies the private key to clipboard. Add the public key to [GitHub SSH Settings](https://github.com/settings/keys).
+- **2) Set Key** — Run on a new server or Mac. Paste your private key and the script handles the rest. Once done, you can `git clone` private repos immediately.
 
 ```bash
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git.sh | bash
@@ -15,11 +15,11 @@ curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git.sh | bash
 
 ## claude.sh — Claude Code Setup
 
-Install, configure, or uninstall Claude Code on macOS and Linux.
+Install, configure, or uninstall Claude Code.
 
-- **1) Install** — Download and run the official installer (`https://claude.ai/install.sh`).
-- **2) Set API** — Prompt for `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`, clean any stale config from shell profiles and `~/.claude/settings.json`, then write a managed block to `~/.zshrc`.
-- **3) Uninstall** — Auto-detect install method (npm / Homebrew / official installer), offer full uninstall or config-only cleanup, remove all related files (`~/.claude/`, `~/.claude.json`, cache, shell env vars), and verify results.
+- **1) Install** — Install Claude Code with one click.
+- **2) Set API** — Enter your API endpoint and key. The script saves them and cleans up any old config automatically.
+- **3) Uninstall** — Remove Claude Code and all its config files. You can also choose to only clear config while keeping the program.
 
 ```bash
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/claude.sh | bash
