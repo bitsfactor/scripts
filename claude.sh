@@ -2,7 +2,7 @@
 
 # =============================================================================
 # Claude Code Setup Tool
-# All-in-one menu: install Claude Code, configure API, or uninstall.
+# All-in-one menu: install, configure API, update, or uninstall Claude Code.
 # Supports macOS and Linux (Debian / Ubuntu).
 #
 # Usage:
@@ -92,38 +92,84 @@ clean_shell_config() {
 }
 
 # clean_settings_json: remove Claude Code API keys from ~/.claude/settings.json
+# 纯 shell 实现：sed 删除目标 key 行，awk 修复 JSON 格式（尾逗号、空 env 块）
 clean_settings_json() {
     local file="$HOME/.claude/settings.json"
     if [ ! -f "$file" ]; then
         return
     fi
 
-    local cleaned=false
-
+    # 检查文件中是否存在目标 key
+    local has_keys=false
     for var in "${CLEAN_VARS[@]}"; do
         if grep -q "\"${var}\"" "$file" 2>/dev/null; then
-            grep -v "\"${var}\"" "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
-            cleaned=true
+            has_keys=true
+            break
         fi
     done
 
-    if [ "$cleaned" = true ]; then
-        # Fix trailing comma issues in JSON
-        perl -0777 -i -pe 's/,(\s*[}\]])/\1/g' "$file" 2>/dev/null || true
+    if [ "$has_keys" = false ]; then
+        return
+    fi
 
-        # Remove empty env object if present
-        if grep -q '"env"' "$file" 2>/dev/null; then
-            local env_content
-            env_content=$(perl -0777 -ne 'if (/"env"\s*:\s*\{([^}]*)\}/) { print $1; }' "$file" 2>/dev/null || true)
-            local trimmed
-            trimmed=$(echo "$env_content" | tr -d '[:space:]')
-            if [ -z "$trimmed" ]; then
-                perl -0777 -i -pe 's/,?\s*"env"\s*:\s*\{\s*\}//g' "$file" 2>/dev/null || true
-                perl -0777 -i -pe 's/,(\s*[}\]])/\1/g' "$file" 2>/dev/null || true
-            fi
-        fi
+    # 删除包含目标 key 的行
+    # 注意：匹配整个文件而非仅 env 块，因为 CLEAN_VARS 中的 key 名（如 ANTHROPIC_BASE_URL）
+    # 在 settings.json 中不会出现在 env 以外的位置，实际不会误删
+    for var in "${CLEAN_VARS[@]}"; do
+        sed_inplace "/\"${var}\"/d" "$file"
+    done
 
+    # 用 awk 修复 JSON 格式：移除空 env 块、修复尾逗号
+    local tmp
+    tmp=$(mktemp)
+
+    awk '
+    { lines[NR] = $0 }
+    END {
+        n = NR
+
+        # 第一轮：移除空 "env": { } 块
+        for (i = 1; i <= n; i++) {
+            if (lines[i] ~ /"env"[[:space:]]*:[[:space:]]*\{[[:space:]]*$/) {
+                j = i + 1
+                while (j <= n && lines[j] ~ /^[[:space:]]*$/) j++
+                if (j <= n && lines[j] ~ /^[[:space:]]*\},?[[:space:]]*$/) {
+                    for (k = i; k <= j; k++) lines[k] = ""
+                }
+            }
+        }
+
+        # 第二轮：修复尾逗号（逗号后紧跟 } 或 ]）
+        for (i = 1; i <= n; i++) {
+            if (lines[i] == "") continue
+            if (lines[i] ~ /,$/) {
+                j = i + 1
+                while (j <= n && (lines[j] == "" || lines[j] ~ /^[[:space:]]*$/)) j++
+                if (j <= n && lines[j] ~ /^[[:space:]]*[}\]]/) {
+                    sub(/,$/, "", lines[i])
+                }
+            }
+        }
+
+        # 输出非空行
+        for (i = 1; i <= n; i++) {
+            if (lines[i] != "") print lines[i]
+        }
+    }
+    ' "$file" > "$tmp"
+
+    # 检查 awk 输出非空，避免用空文件覆盖原文件
+    if [ ! -s "$tmp" ]; then
+        echo -e "  ${YELLOW}[Warning] Failed to process ~/.claude/settings.json${NC}"
+        rm -f "$tmp"
+        return
+    fi
+
+    if mv "$tmp" "$file"; then
         echo -e "  ${GREEN}✓${NC} Cleaned ~/.claude/settings.json env entries"
+    else
+        echo -e "  ${YELLOW}[Warning] Failed to update ~/.claude/settings.json${NC}"
+        rm -f "$tmp"
     fi
 }
 
@@ -133,6 +179,43 @@ clean_all_shell_configs() {
     for config in "${SHELL_CONFIGS[@]}"; do
         clean_shell_config "$config"
     done
+}
+
+# run_official_installer: 下载并执行官方安装脚本
+# 用于 install 和 update (other 方式) 的公共逻辑
+run_official_installer() {
+    local tmp_installer
+    tmp_installer=$(mktemp)
+    if ! curl -fsSL https://claude.ai/install.sh -o "$tmp_installer"; then
+        echo -e "${RED}[Error] Failed to download installer.${NC}"
+        rm -f "$tmp_installer"
+        return 1
+    fi
+    bash "$tmp_installer" || { rm -f "$tmp_installer"; return 1; }
+    rm -f "$tmp_installer"
+}
+
+# detect_install_method: 检测 Claude Code 的安装方式
+# 设置全局变量 INSTALL_METHOD: "npm" / "homebrew" / "other" / ""
+# 同时设置 CLAUDE_PATH（仅 other 方式时有值）
+detect_install_method() {
+    INSTALL_METHOD=""
+    CLAUDE_PATH=""
+
+    if command -v npm &> /dev/null && npm list -g @anthropic-ai/claude-code 2>/dev/null | grep -q "claude-code"; then
+        INSTALL_METHOD="npm"
+        echo -e "Detected: ${CYAN}NPM global install${NC}"
+    elif [ "$OS_TYPE" = "macos" ] && command -v brew &> /dev/null && brew list --cask claude-code 2>/dev/null | grep -q "."; then
+        INSTALL_METHOD="homebrew"
+        echo -e "Detected: ${CYAN}Homebrew Cask${NC}"
+    elif command -v claude &> /dev/null; then
+        INSTALL_METHOD="other"
+        CLAUDE_PATH=$(which claude 2>/dev/null || true)
+        echo -e "Detected: ${CYAN}Official installer / manual${NC}"
+        echo -e "Binary path: ${YELLOW}${CLAUDE_PATH}${NC}"
+    else
+        echo -e "${YELLOW}[Notice] Claude Code installation not detected.${NC}"
+    fi
 }
 
 # =============================================================================
@@ -145,15 +228,9 @@ do_install() {
 
     echo -e "${BLUE}Installing via official installer...${NC}\n"
 
-    local tmp_installer
-    tmp_installer=$(mktemp)
-    if ! curl -fsSL https://claude.ai/install.sh -o "$tmp_installer"; then
-        echo -e "${RED}[Error] Failed to download installer.${NC}"
-        rm -f "$tmp_installer"
+    if ! run_official_installer; then
         return 1
     fi
-    bash "$tmp_installer" || { rm -f "$tmp_installer"; return 1; }
-    rm -f "$tmp_installer"
 
     echo -e "\n${GREEN}[Success] Claude Code installed!${NC}"
 }
@@ -247,23 +324,7 @@ do_uninstall() {
     # ---- Detect install method ----
     echo -e "\n${BLUE}[Step 1/6] Detecting install method...${NC}"
 
-    local INSTALL_METHOD=""
-
-    if command -v npm &> /dev/null && npm list -g @anthropic-ai/claude-code 2>/dev/null | grep -q "claude-code"; then
-        INSTALL_METHOD="npm"
-        echo -e "Detected: ${CYAN}NPM global install${NC}"
-    elif [ "$OS_TYPE" = "macos" ] && command -v brew &> /dev/null && brew list --cask claude-code 2>/dev/null | grep -q "."; then
-        INSTALL_METHOD="homebrew"
-        echo -e "Detected: ${CYAN}Homebrew Cask${NC}"
-    elif command -v claude &> /dev/null; then
-        INSTALL_METHOD="other"
-        local CLAUDE_PATH
-        CLAUDE_PATH=$(which claude 2>/dev/null || true)
-        echo -e "Detected: ${CYAN}Official installer / manual${NC}"
-        echo -e "Binary path: ${YELLOW}${CLAUDE_PATH}${NC}"
-    else
-        echo -e "${YELLOW}[Notice] Claude Code installation not detected.${NC}"
-    fi
+    detect_install_method
 
     # ---- Scan config items ----
     echo -e "\n${BLUE}[Step 2/6] Scanning config files...${NC}"
@@ -382,20 +443,19 @@ do_uninstall() {
                 ;;
             other)
                 echo -e "Removing binary..."
-                local CLAUDE_BIN
-                CLAUDE_BIN=$(which claude 2>/dev/null || true)
                 local REMOVED_BIN=false
 
-                if [ -n "$CLAUDE_BIN" ]; then
-                    if rm "$CLAUDE_BIN" 2>/dev/null || sudo rm "$CLAUDE_BIN" 2>/dev/null; then
-                        echo -e "${GREEN}[Success] Removed ${CLAUDE_BIN}${NC}"
+                if [ -n "$CLAUDE_PATH" ]; then
+                    if rm "$CLAUDE_PATH" 2>/dev/null || sudo rm "$CLAUDE_PATH" 2>/dev/null; then
+                        echo -e "${GREEN}[Success] Removed ${CLAUDE_PATH}${NC}"
                         REMOVED_BIN=true
                     else
-                        echo -e "${RED}[Error] Cannot remove ${CLAUDE_BIN}${NC}"
+                        echo -e "${RED}[Error] Cannot remove ${CLAUDE_PATH}${NC}"
                     fi
                 fi
 
-                if [ -f "$HOME/.local/bin/claude" ]; then
+                # 避免与 CLAUDE_PATH 重复删除同一文件
+                if [ -f "$HOME/.local/bin/claude" ] && [ "$CLAUDE_PATH" != "$HOME/.local/bin/claude" ]; then
                     if rm "$HOME/.local/bin/claude" 2>/dev/null; then
                         echo -e "${GREEN}[Success] Removed ~/.local/bin/claude${NC}"
                         REMOVED_BIN=true
@@ -498,6 +558,67 @@ do_uninstall() {
 }
 
 # =============================================================================
+# 4) Update Claude Code — detect install method and run upgrade command
+# =============================================================================
+
+do_update() {
+    echo -e "\n${BLUE}=== Update Claude Code ===${NC}"
+    echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}"
+
+    # ---- Detect install method ----
+    echo -e "\n${BLUE}[Step 1/2] Detecting install method...${NC}"
+
+    detect_install_method
+
+    if [ -z "$INSTALL_METHOD" ]; then
+        echo -e "\n${RED}[Error] Claude Code is not installed. Cannot update.${NC}"
+        return 1
+    fi
+
+    # ---- Run upgrade command ----
+    echo -e "\n${BLUE}[Step 2/2] Updating Claude Code...${NC}"
+
+    case "$INSTALL_METHOD" in
+        npm)
+            echo -e "Updating via NPM..."
+            if npm update -g @anthropic-ai/claude-code; then
+                echo -e "${GREEN}[Success] NPM update complete.${NC}"
+            else
+                echo -e "${YELLOW}[Warning] NPM update failed, trying sudo...${NC}"
+                if sudo npm update -g @anthropic-ai/claude-code; then
+                    echo -e "${GREEN}[Success] NPM update complete (sudo).${NC}"
+                else
+                    echo -e "${RED}[Error] NPM update failed.${NC}"
+                    return 1
+                fi
+            fi
+            ;;
+        homebrew)
+            echo -e "Updating via Homebrew..."
+            if brew upgrade --cask claude-code; then
+                echo -e "${GREEN}[Success] Homebrew upgrade complete.${NC}"
+            else
+                echo -e "${RED}[Error] Homebrew upgrade failed.${NC}"
+                return 1
+            fi
+            ;;
+        other)
+            echo -e "Updating via official installer..."
+            if ! run_official_installer; then
+                return 1
+            fi
+            echo -e "${GREEN}[Success] Reinstall complete.${NC}"
+            ;;
+    esac
+
+    # ---- Show version ----
+    echo -e "\n${CYAN}Current version:${NC}"
+    claude --version 2>/dev/null || echo -e "${YELLOW}[Warning] Could not retrieve version.${NC}"
+
+    echo -e "\n${GREEN}[Success] Claude Code updated!${NC}"
+}
+
+# =============================================================================
 # Entry menu
 # =============================================================================
 
@@ -508,14 +629,16 @@ echo -e "${CYAN}Select an option:${NC}"
 echo -e "  ${GREEN}1)${NC} Install Claude Code"
 echo -e "  ${GREEN}2)${NC} Set API"
 echo -e "  ${RED}3)${NC} Uninstall Claude Code"
+echo -e "  ${GREEN}4)${NC} Update Claude Code"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
-read -p "Enter option (0/1/2/3): " MENU_CHOICE < /dev/tty
+read -p "Enter option (0/1/2/3/4): " MENU_CHOICE < /dev/tty
 
 case "$MENU_CHOICE" in
     1) do_install ;;
     2) do_set_api ;;
     3) do_uninstall ;;
+    4) do_update ;;
     0|"")
         echo -e "${YELLOW}Exited.${NC}"
         exit 0
