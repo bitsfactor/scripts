@@ -306,7 +306,7 @@ EOF
 }
 
 # =============================================================================
-# 3) Uninstall Claude Code — detect install method, remove binary and configs
+# 4) Uninstall Claude Code — detect install method, remove binary and configs
 # =============================================================================
 
 do_uninstall() {
@@ -558,7 +558,7 @@ do_uninstall() {
 }
 
 # =============================================================================
-# 4) Update Claude Code — detect install method and run upgrade command
+# 3) Update Claude Code — detect install method and run upgrade command
 # =============================================================================
 
 do_update() {
@@ -628,8 +628,8 @@ echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}\n"
 echo -e "${CYAN}Select an option:${NC}"
 echo -e "  ${GREEN}1)${NC} Install Claude Code"
 echo -e "  ${GREEN}2)${NC} Set API"
-echo -e "  ${RED}3)${NC} Uninstall Claude Code"
-echo -e "  ${GREEN}4)${NC} Update Claude Code"
+echo -e "  ${GREEN}3)${NC} Update Claude Code"
+echo -e "  ${RED}4)${NC} Uninstall Claude Code"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
 read -p "Enter option (0/1/2/3/4): " MENU_CHOICE < /dev/tty
@@ -637,8 +637,8 @@ read -p "Enter option (0/1/2/3/4): " MENU_CHOICE < /dev/tty
 case "$MENU_CHOICE" in
     1) do_install ;;
     2) do_set_api ;;
-    3) do_uninstall ;;
-    4) do_update ;;
+    3) do_update ;;
+    4) do_uninstall ;;
     0|"")
         echo -e "${YELLOW}Exited.${NC}"
         exit 0
