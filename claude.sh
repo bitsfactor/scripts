@@ -33,6 +33,14 @@ case "$OSTYPE" in
         ;;
 esac
 
+# ---- Detect user's login shell RC file ----
+
+USER_SHELL="$(basename "${SHELL:-/bin/bash}")"
+case "$USER_SHELL" in
+    zsh)  SHELL_RC="$HOME/.zshrc" ;;
+    *)    SHELL_RC="$HOME/.bashrc" ;;
+esac
+
 # ---- Shared variables for API config cleanup ----
 
 CLEAN_VARS=("ANTHROPIC_BASE_URL" "ANTHROPIC_AUTH_TOKEN" "ANTHROPIC_API_KEY" "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC" "API_TIMEOUT_MS")
@@ -185,12 +193,13 @@ do_set_api() {
 
     echo -e "  ${GREEN}Old config cleanup done.${NC}"
 
-    # ---- Write new config to ~/.zshrc ----
-    echo -e "\n${BLUE}[Step 3/4] Writing new config to ~/.zshrc...${NC}"
+    # ---- Write new config to shell RC file ----
+    local SHELL_RC_DISPLAY="${SHELL_RC/#$HOME/~}"
+    echo -e "\n${BLUE}[Step 3/4] Writing new config to ${SHELL_RC_DISPLAY}...${NC}"
 
-    touch "$HOME/.zshrc"
+    touch "$SHELL_RC"
 
-    cat >> "$HOME/.zshrc" << EOF
+    cat >> "$SHELL_RC" << EOF
 
 # >>> Claude Code API config (managed by claude.sh) >>>
 export ANTHROPIC_BASE_URL='${INPUT_URL}'
@@ -199,13 +208,13 @@ export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
 # <<< Claude Code API config <<<
 EOF
 
-    echo -e "  ${GREEN}✓${NC} Written to ~/.zshrc"
+    echo -e "  ${GREEN}✓${NC} Written to ${SHELL_RC_DISPLAY}"
 
     # ---- Summary ----
     echo -e "\n${BLUE}[Step 4/4] Configuration summary...${NC}"
 
     echo -e "\n${CYAN}========================================${NC}"
-    echo -e "  Written to ~/.zshrc:"
+    echo -e "  Written to ${SHELL_RC_DISPLAY}:"
     echo -e "  ${GREEN}ANTHROPIC_BASE_URL${NC}  = ${YELLOW}${INPUT_URL}${NC}"
     echo -e "  ${GREEN}ANTHROPIC_AUTH_TOKEN${NC} = ${YELLOW}******${NC}"
     echo -e "  ${GREEN}CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC${NC} = ${YELLOW}1${NC}"
@@ -214,7 +223,7 @@ EOF
     echo -e "\n${GREEN}[Success] Claude Code API configured!${NC}"
     echo -e "${YELLOW}[Reminder] To apply the changes:${NC}"
     echo -e "  1. Reopen your terminal"
-    echo -e "  2. Or run: ${CYAN}source ~/.zshrc${NC}"
+    echo -e "  2. Or run: ${CYAN}source ${SHELL_RC_DISPLAY}${NC}"
 }
 
 # =============================================================================
