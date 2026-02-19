@@ -173,6 +173,92 @@ clean_settings_json() {
     fi
 }
 
+# repair_settings_json: 检测并修复 ~/.claude/settings.json 的 JSON 格式问题
+# 修复策略：空文件写入 {}，非空文件移除空行/修复尾逗号，括号不配对则备份并重建
+repair_settings_json() {
+    local file="$HOME/.claude/settings.json"
+
+    # 文件不存在 → 跳过
+    if [ ! -f "$file" ]; then
+        return
+    fi
+
+    # 文件为空 → 写入 {}
+    if [ ! -s "$file" ]; then
+        echo '{}' > "$file"
+        echo -e "  ${GREEN}✓${NC} Repaired ~/.claude/settings.json (was empty, wrote {})"
+        return
+    fi
+
+    # _backup_and_reset: 备份原文件并重置为 {}
+    # Args: $1 = 警告信息
+    _backup_and_reset() {
+        local bak_name="settings.json.bak.$(date +%Y%m%d%H%M%S)"
+        cp "$file" "$HOME/.claude/${bak_name}"
+        echo '{}' > "$file"
+        echo -e "  ${YELLOW}[Warning] $1${NC}"
+        echo -e "  ${YELLOW}Backed up to ${bak_name} and reset to {}.${NC}"
+    }
+
+    # 文件非空 → 用 awk 修复
+    local tmp
+    tmp=$(mktemp)
+
+    awk '
+    # 跳过空行
+    /^[[:space:]]*$/ { next }
+
+    { lines[++n] = $0 }
+
+    END {
+        # 修复尾逗号（逗号后紧跟 } 或 ]）
+        for (i = 1; i <= n; i++) {
+            if (lines[i] ~ /,$/) {
+                j = i + 1
+                if (j <= n && lines[j] ~ /^[[:space:]]*[}\]]/) {
+                    sub(/,$/, "", lines[i])
+                }
+            }
+        }
+
+        # 输出所有行
+        for (i = 1; i <= n; i++) {
+            print lines[i]
+        }
+    }
+    ' "$file" > "$tmp"
+
+    # awk 输出为空（文件全是空白行）→ 视为无法修复，备份并重建
+    if [ ! -s "$tmp" ]; then
+        _backup_and_reset "~/.claude/settings.json had no valid content."
+        rm -f "$tmp"
+        return
+    fi
+
+    # 检查大括号和方括号是否配对（gsub 返回替换次数，兼容所有 awk 实现）
+    local open_braces close_braces open_brackets close_brackets
+    open_braces=$(awk '{n+=gsub(/{/,"")} END{print n+0}' "$tmp")
+    close_braces=$(awk '{n+=gsub(/}/,"")} END{print n+0}' "$tmp")
+    open_brackets=$(awk '{n+=gsub(/\[/,"")} END{print n+0}' "$tmp")
+    close_brackets=$(awk '{n+=gsub(/\]/,"")} END{print n+0}' "$tmp")
+
+    if [ "$open_braces" -ne "$close_braces" ] || [ "$open_brackets" -ne "$close_brackets" ]; then
+        _backup_and_reset "~/.claude/settings.json had mismatched brackets."
+        rm -f "$tmp"
+        return
+    fi
+
+    # 比较修复前后是否有变化
+    if ! cmp -s "$file" "$tmp"; then
+        mv "$tmp" "$file"
+        echo -e "  ${GREEN}✓${NC} Repaired ~/.claude/settings.json (fixed formatting)"
+    else
+        rm -f "$tmp"
+    fi
+
+    unset -f _backup_and_reset
+}
+
 # clean_all_shell_configs: clean all known shell config files
 clean_all_shell_configs() {
     local SHELL_CONFIGS=("$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile")
@@ -226,13 +312,18 @@ do_install() {
     echo -e "\n${BLUE}=== Install / Update Claude Code ===${NC}"
     echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}"
 
+    # ---- Repair settings.json ----
+    echo -e "\n${BLUE}[Step 1/3] Checking settings.json...${NC}"
+
+    repair_settings_json
+
     # ---- Detect install method ----
-    echo -e "\n${BLUE}[Step 1/2] Detecting install method...${NC}"
+    echo -e "\n${BLUE}[Step 2/3] Detecting install method...${NC}"
 
     detect_install_method
 
     # ---- Install or update ----
-    echo -e "\n${BLUE}[Step 2/2] Installing / updating Claude Code...${NC}"
+    echo -e "\n${BLUE}[Step 3/3] Installing / updating Claude Code...${NC}"
 
     if [ -z "$INSTALL_METHOD" ]; then
         echo -e "No existing installation found. Installing via official installer...\n"
@@ -288,8 +379,13 @@ do_set_api() {
     echo -e "\n${BLUE}=== Configure Claude Code API ===${NC}"
     echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}"
 
+    # ---- Repair settings.json ----
+    echo -e "\n${BLUE}[Step 1/5] Checking settings.json...${NC}"
+
+    repair_settings_json
+
     # ---- Prompt for input ----
-    echo -e "\n${BLUE}[Step 1/4] Enter API configuration...${NC}"
+    echo -e "\n${BLUE}[Step 2/5] Enter API configuration...${NC}"
 
     echo -e "${CYAN}Enter ANTHROPIC_BASE_URL (API endpoint):${NC}"
     read -r INPUT_URL < /dev/tty
@@ -310,7 +406,7 @@ do_set_api() {
     echo -e "${GREEN}Input received.${NC}"
 
     # ---- Clean old config ----
-    echo -e "\n${BLUE}[Step 2/4] Cleaning old configuration...${NC}"
+    echo -e "\n${BLUE}[Step 3/5] Cleaning old configuration...${NC}"
 
     clean_all_shell_configs
     clean_settings_json
@@ -319,7 +415,7 @@ do_set_api() {
 
     # ---- Write new config to shell RC file ----
     local SHELL_RC_DISPLAY="${SHELL_RC/#$HOME/~}"
-    echo -e "\n${BLUE}[Step 3/4] Writing new config to ${SHELL_RC_DISPLAY}...${NC}"
+    echo -e "\n${BLUE}[Step 4/5] Writing new config to ${SHELL_RC_DISPLAY}...${NC}"
 
     touch "$SHELL_RC"
 
@@ -335,7 +431,7 @@ EOF
     echo -e "  ${GREEN}✓${NC} Written to ${SHELL_RC_DISPLAY}"
 
     # ---- Summary ----
-    echo -e "\n${BLUE}[Step 4/4] Configuration summary...${NC}"
+    echo -e "\n${BLUE}[Step 5/5] Configuration summary...${NC}"
 
     echo -e "\n${CYAN}========================================${NC}"
     echo -e "  Written to ${SHELL_RC_DISPLAY}:"
