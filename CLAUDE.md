@@ -13,7 +13,7 @@ git.sh        # Git SSH 密钥管理工具（获取密钥 / 配置密钥，二�
 claude.sh     # Claude Code 设置工具（安装 / 配置 API / 卸载，三合一菜单）
 ```
 
-项目无构建系统、包管理器或测试框架。脚本为独立的 bash 文件，可直接运行或通过 `curl | bash` 从 GitHub raw URL 远程执行。
+项目无构建系统、包管理器或测试框架。脚本为独立的 bash 文件，可直接运行或通过 `curl | bash` 从 jsDelivr CDN 远程执行。
 
 ## 运行脚本
 
@@ -23,8 +23,8 @@ bash git.sh
 bash claude.sh
 
 # 远程执行（主要使用方式）
-curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git.sh | bash
-curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/claude.sh | bash
+curl -s https://cdn.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
+curl -s https://cdn.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
 ```
 
 ## 脚本规范
