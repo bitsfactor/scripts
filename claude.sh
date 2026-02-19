@@ -12,6 +12,8 @@
 
 set -e
 
+VERSION="1.0.0"
+
 # Color definitions
 GREEN='\033[32m'
 RED='\033[31m'
@@ -499,7 +501,7 @@ do_uninstall() {
 # Entry menu
 # =============================================================================
 
-echo -e "${BLUE}=== Claude Code Setup ===${NC}"
+echo -e "${BLUE}=== Claude Code Setup v${VERSION} ===${NC}"
 echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}\n"
 
 echo -e "${CYAN}Select an option:${NC}"

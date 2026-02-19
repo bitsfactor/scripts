@@ -12,6 +12,8 @@
 
 set -e
 
+VERSION="1.0.0"
+
 # Color definitions
 GREEN='\033[32m'
 RED='\033[31m'
@@ -159,7 +161,7 @@ do_set_key() {
 # Entry menu
 # =============================================================================
 
-echo -e "${BLUE}=== Git SSH Key Manager ===${NC}\n"
+echo -e "${BLUE}=== Git SSH Key Manager v${VERSION} ===${NC}\n"
 
 echo -e "${CYAN}Select an option:${NC}"
 echo -e "  ${GREEN}1)${NC} Retrieve Keys (local machine)"
