@@ -2,7 +2,7 @@
 
 # =============================================================================
 # Claude Code Setup Tool
-# All-in-one menu: install, configure API, update, or uninstall Claude Code.
+# All-in-one menu: install / update, configure API, or uninstall Claude Code.
 # Supports macOS and Linux (Debian / Ubuntu).
 #
 # Usage:
@@ -219,20 +219,65 @@ detect_install_method() {
 }
 
 # =============================================================================
-# 1) Install Claude Code
+# 1) Install / Update Claude Code
 # =============================================================================
 
 do_install() {
-    echo -e "\n${BLUE}=== Install Claude Code ===${NC}"
-    echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}\n"
+    echo -e "\n${BLUE}=== Install / Update Claude Code ===${NC}"
+    echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}"
 
-    echo -e "${BLUE}Installing via official installer...${NC}\n"
+    # ---- Detect install method ----
+    echo -e "\n${BLUE}[Step 1/2] Detecting install method...${NC}"
 
-    if ! run_official_installer; then
-        return 1
+    detect_install_method
+
+    # ---- Install or update ----
+    echo -e "\n${BLUE}[Step 2/2] Installing / updating Claude Code...${NC}"
+
+    if [ -z "$INSTALL_METHOD" ]; then
+        echo -e "No existing installation found. Installing via official installer...\n"
+        if ! run_official_installer; then
+            return 1
+        fi
+    else
+        case "$INSTALL_METHOD" in
+            npm)
+                echo -e "Updating via NPM..."
+                if npm update -g @anthropic-ai/claude-code; then
+                    echo -e "${GREEN}[Success] NPM update complete.${NC}"
+                else
+                    echo -e "${YELLOW}[Warning] NPM update failed, trying sudo...${NC}"
+                    if sudo npm update -g @anthropic-ai/claude-code; then
+                        echo -e "${GREEN}[Success] NPM update complete (sudo).${NC}"
+                    else
+                        echo -e "${RED}[Error] NPM update failed.${NC}"
+                        return 1
+                    fi
+                fi
+                ;;
+            homebrew)
+                echo -e "Updating via Homebrew..."
+                if brew upgrade --cask claude-code; then
+                    echo -e "${GREEN}[Success] Homebrew upgrade complete.${NC}"
+                else
+                    echo -e "${RED}[Error] Homebrew upgrade failed.${NC}"
+                    return 1
+                fi
+                ;;
+            other)
+                echo -e "Updating via official installer...\n"
+                if ! run_official_installer; then
+                    return 1
+                fi
+                ;;
+        esac
     fi
 
-    echo -e "\n${GREEN}[Success] Claude Code installed!${NC}"
+    # ---- Show version ----
+    echo -e "\n${CYAN}Current version:${NC}"
+    claude --version 2>/dev/null || echo -e "${YELLOW}[Warning] Could not retrieve version.${NC}"
+
+    echo -e "\n${GREEN}[Success] Claude Code is ready!${NC}"
 }
 
 # =============================================================================
@@ -306,7 +351,7 @@ EOF
 }
 
 # =============================================================================
-# 4) Uninstall Claude Code — detect install method, remove binary and configs
+# 3) Uninstall Claude Code — detect install method, remove binary and configs
 # =============================================================================
 
 do_uninstall() {
@@ -558,67 +603,6 @@ do_uninstall() {
 }
 
 # =============================================================================
-# 3) Update Claude Code — detect install method and run upgrade command
-# =============================================================================
-
-do_update() {
-    echo -e "\n${BLUE}=== Update Claude Code ===${NC}"
-    echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}"
-
-    # ---- Detect install method ----
-    echo -e "\n${BLUE}[Step 1/2] Detecting install method...${NC}"
-
-    detect_install_method
-
-    if [ -z "$INSTALL_METHOD" ]; then
-        echo -e "\n${RED}[Error] Claude Code is not installed. Cannot update.${NC}"
-        return 1
-    fi
-
-    # ---- Run upgrade command ----
-    echo -e "\n${BLUE}[Step 2/2] Updating Claude Code...${NC}"
-
-    case "$INSTALL_METHOD" in
-        npm)
-            echo -e "Updating via NPM..."
-            if npm update -g @anthropic-ai/claude-code; then
-                echo -e "${GREEN}[Success] NPM update complete.${NC}"
-            else
-                echo -e "${YELLOW}[Warning] NPM update failed, trying sudo...${NC}"
-                if sudo npm update -g @anthropic-ai/claude-code; then
-                    echo -e "${GREEN}[Success] NPM update complete (sudo).${NC}"
-                else
-                    echo -e "${RED}[Error] NPM update failed.${NC}"
-                    return 1
-                fi
-            fi
-            ;;
-        homebrew)
-            echo -e "Updating via Homebrew..."
-            if brew upgrade --cask claude-code; then
-                echo -e "${GREEN}[Success] Homebrew upgrade complete.${NC}"
-            else
-                echo -e "${RED}[Error] Homebrew upgrade failed.${NC}"
-                return 1
-            fi
-            ;;
-        other)
-            echo -e "Updating via official installer..."
-            if ! run_official_installer; then
-                return 1
-            fi
-            echo -e "${GREEN}[Success] Reinstall complete.${NC}"
-            ;;
-    esac
-
-    # ---- Show version ----
-    echo -e "\n${CYAN}Current version:${NC}"
-    claude --version 2>/dev/null || echo -e "${YELLOW}[Warning] Could not retrieve version.${NC}"
-
-    echo -e "\n${GREEN}[Success] Claude Code updated!${NC}"
-}
-
-# =============================================================================
 # Entry menu
 # =============================================================================
 
@@ -626,19 +610,17 @@ echo -e "${BLUE}=== Claude Code Setup v${VERSION} ===${NC}"
 echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}\n"
 
 echo -e "${CYAN}Select an option:${NC}"
-echo -e "  ${GREEN}1)${NC} Install Claude Code"
+echo -e "  ${GREEN}1)${NC} Install / Update Claude Code"
 echo -e "  ${GREEN}2)${NC} Set API"
-echo -e "  ${GREEN}3)${NC} Update Claude Code"
-echo -e "  ${RED}4)${NC} Uninstall Claude Code"
+echo -e "  ${RED}3)${NC} Uninstall Claude Code"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
-read -p "Enter option (0/1/2/3/4): " MENU_CHOICE < /dev/tty
+read -p "Enter option (0/1/2/3): " MENU_CHOICE < /dev/tty
 
 case "$MENU_CHOICE" in
     1) do_install ;;
     2) do_set_api ;;
-    3) do_update ;;
-    4) do_uninstall ;;
+    3) do_uninstall ;;
     0|"")
         echo -e "${YELLOW}Exited.${NC}"
         exit 0

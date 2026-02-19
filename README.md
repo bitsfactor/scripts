@@ -15,9 +15,9 @@ curl -s https://cdn.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
 
 ## claude.sh — Claude Code Setup
 
-Install, configure, or uninstall Claude Code.
+Install / update, configure, or uninstall Claude Code.
 
-- **1) Install** — Install Claude Code with one click.
+- **1) Install / Update** — Install Claude Code, or update it if already installed. Automatically detects the install method (npm, Homebrew, official installer) and runs the matching upgrade command.
 - **2) Set API** — Enter your API endpoint and key. The script saves them and cleans up any old config automatically.
 - **3) Uninstall** — Remove Claude Code and all its config files. You can also choose to only clear config while keeping the program.
 
