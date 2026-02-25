@@ -34,3 +34,11 @@ curl -s https://cdn.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
 - 跨平台剪贴板支持（macOS `pbcopy`、Linux `xclip`/`wl-copy`、Windows `clip.exe`）
 - SSH 密钥类型优先级：ed25519 优先，RSA 作为备选
 - 所有脚本必须同时支持 macOS 和 Linux（尤其是 Debian 和 Ubuntu 系统）
+
+## 发布流程
+
+每次 `git push` 到 remote 后，必须请求 jsDelivr purge 链接清除 CDN 缓存，确保远程执行拿到最新版本。对每个有变更的脚本文件都要清除：
+
+```
+https://purge.jsdelivr.net/gh/bitsfactor/scripts@main/<filename>
+```
