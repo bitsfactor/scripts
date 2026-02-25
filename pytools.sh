@@ -149,7 +149,15 @@ make_wrapper() {
 do_install() {
     local url dest py_file
 
-    echo -e "\n${BLUE}=== Install / Update PyTools ===${NC}"
+    # Detect install vs update based on whether venv already exists
+    local is_update=false
+    [ -d "$VENV_DIR" ] && is_update=true
+
+    if [ "$is_update" = true ]; then
+        echo -e "\n${BLUE}=== Update PyTools ===${NC}"
+    else
+        echo -e "\n${BLUE}=== Install PyTools ===${NC}"
+    fi
     echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}"
 
     # Step 1/6: Check python3
@@ -198,23 +206,39 @@ do_install() {
         make_wrapper "$py_file"
     done
 
-    # Step 4/6: Create virtual environment
-    echo -e "\n${BLUE}[Step 4/6] Creating virtual environment...${NC}"
+    # Step 4/6: Create / update virtual environment
+    if [ "$is_update" = true ]; then
+        echo -e "\n${BLUE}[Step 4/6] Updating virtual environment...${NC}"
+    else
+        echo -e "\n${BLUE}[Step 4/6] Creating virtual environment...${NC}"
+    fi
     if ! python3 -m venv "$VENV_DIR"; then
         echo -e "  ${RED}[Error] Failed to create virtual environment.${NC}"
         echo -e "  ${YELLOW}On Debian/Ubuntu, run: sudo apt-get install python3-venv${NC}"
         return 1
     fi
-    echo -e "  ${GREEN}✓${NC} Venv created: ~/pytools/.venv/"
+    echo -e "  ${GREEN}✓${NC} Venv ready: ~/pytools/.venv/"
 
-    # Step 5/6: Install Python dependencies into venv
-    echo -e "\n${BLUE}[Step 5/6] Installing Python dependencies into venv...${NC}"
-    echo -e "  Dependencies: ${CYAN}${PYTOOLS_DEPS[*]}${NC}"
-    if ! "$VENV_DIR/bin/pip" install "${PYTOOLS_DEPS[@]}" --quiet; then
-        echo -e "  ${RED}[Error] pip install failed. Please check your Python environment.${NC}"
-        return 1
+    # Step 5/6: Install / upgrade Python dependencies into venv
+    if [ "$is_update" = true ]; then
+        echo -e "\n${BLUE}[Step 5/6] Upgrading Python dependencies in venv...${NC}"
+    else
+        echo -e "\n${BLUE}[Step 5/6] Installing Python dependencies into venv...${NC}"
     fi
-    echo -e "  ${GREEN}✓${NC} Dependencies installed into venv"
+    echo -e "  Dependencies: ${CYAN}${PYTOOLS_DEPS[*]}${NC}"
+    if [ "$is_update" = true ]; then
+        if ! "$VENV_DIR/bin/pip" install "${PYTOOLS_DEPS[@]}" --upgrade --quiet; then
+            echo -e "  ${RED}[Error] pip upgrade failed. Please check your Python environment.${NC}"
+            return 1
+        fi
+        echo -e "  ${GREEN}✓${NC} Dependencies upgraded in venv"
+    else
+        if ! "$VENV_DIR/bin/pip" install "${PYTOOLS_DEPS[@]}" --quiet; then
+            echo -e "  ${RED}[Error] pip install failed. Please check your Python environment.${NC}"
+            return 1
+        fi
+        echo -e "  ${GREEN}✓${NC} Dependencies installed into venv"
+    fi
 
     # Step 6/6: Configure PATH
     echo -e "\n${BLUE}[Step 6/6] Configuring PATH...${NC}"
@@ -222,9 +246,15 @@ do_install() {
     write_path_block "$PYTOOLS_BLOCK_START" "$PYTOOLS_BLOCK_END" "$pytools_content"
 
     local display="${SHELL_RC/#$HOME/~}"
-    echo -e "\n${GREEN}[Success] PyTools installed!${NC}"
-    echo -e "${YELLOW}[Reminder] To apply PATH changes in your current terminal:${NC}"
-    echo -e "  ${CYAN}source ${display}${NC}"
+    if [ "$is_update" = true ]; then
+        echo -e "\n${GREEN}[Success] PyTools updated!${NC}"
+    else
+        echo -e "\n${GREEN}[Success] PyTools installed!${NC}"
+    fi
+    if [ "$is_update" = false ]; then
+        echo -e "${YELLOW}[Reminder] To apply PATH changes in your current terminal:${NC}"
+        echo -e "  ${CYAN}source ${display}${NC}"
+    fi
     echo -e "\nAvailable commands:"
     for py_file in "${PYTOOLS_FILES[@]}"; do
         echo -e "  ${GREEN}${py_file%.py}${NC}"
