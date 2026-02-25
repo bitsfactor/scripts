@@ -61,9 +61,6 @@ class dogecloud_config:
     配置字段说明：
         access_key       多吉云 AccessKey
         secret_key       多吉云 SecretKey
-        endpoint         COS Endpoint（如 https://cos.ap-chengdu.myqcloud.com）
-        bucket           COS Bucket 名称（如 s-cd-14700-api-01-1258813047）
-        region           COS Region（如 ap-chengdu）
         dogecloud_bucket 多吉云桶名（如 api-01）
         cdn_domain       CDN 域名（如 https://image.ic.work）
     """
@@ -125,9 +122,6 @@ class dogecloud_config:
         config = {
             "access_key":       _input("多吉云 AccessKey"),
             "secret_key":       _input("多吉云 SecretKey"),
-            "endpoint":         _input("COS Endpoint", "https://cos.ap-chengdu.myqcloud.com"),
-            "bucket":           _input("COS Bucket"),
-            "region":           _input("Region", "ap-chengdu"),
             "dogecloud_bucket": _input("多吉云桶名"),
             "cdn_domain":       _input("CDN 域名", "https://image.ic.work"),
         }
@@ -166,7 +160,7 @@ class dogecloud_auth:
     用法示例：
         auth = dogecloud_auth("your_access_key", "your_secret_key")
         tmp_cred = auth.get_tmp_credentials("api-01")
-        # 返回 {access_key_id, secret_access_key, session_token, expired_at}
+        # 返回 {access_key_id, secret_access_key, session_token, s3_bucket, s3_endpoint}
 
     API 文档：https://docs.dogecloud.com/oss/api-tmp-token
     """
@@ -206,25 +200,25 @@ class dogecloud_auth:
         调用多吉云 API 获取腾讯云 COS 临时凭证。
 
         参数：
-            bucket  多吉云桶名（如 api-01）
+            bucket  多吉云桶名（如 api-01），用于从响应的 Buckets 数组中匹配对应桶信息
 
         返回：
-            dict {access_key_id, secret_access_key, session_token, expired_at}
+            dict {access_key_id, secret_access_key, session_token, s3_bucket, s3_endpoint}
 
         示例：
             cred = auth.get_tmp_credentials("api-01")
         """
-        path = "/oss/tmp/token.json"
-        body = f"bucket={bucket}"
-        signature = self._sign(path, body)
+        path = "/auth/tmp_token.json"
+        payload = json.dumps({"channel": "OSS_FULL", "scopes": ["*"]})
+        signature = self._sign(path, payload)
 
         url = f"{self._api_base}{path}"
         headers = {
             "Authorization": f"TOKEN {self._access_key}:{signature}",
-            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Type": "application/json",
         }
 
-        resp = requests.post(url, data=body, headers=headers, timeout=15)
+        resp = requests.post(url, data=payload, headers=headers, timeout=15)
         resp.raise_for_status()
 
         data = resp.json()
@@ -232,11 +226,18 @@ class dogecloud_auth:
             raise RuntimeError(f"多吉云 API 错误：code={data.get('code')}，msg={data.get('msg')}")
 
         cred = data["data"]["Credentials"]
+        bucket_info = next(
+            (b for b in data["data"].get("Buckets", []) if b["name"] == bucket),
+            None,
+        )
+        if bucket_info is None:
+            raise RuntimeError(f"多吉云桶 '{bucket}' 未找到，请检查 dogecloud_bucket 配置")
         return {
-            "access_key_id":     cred["TmpSecretId"],
-            "secret_access_key": cred["TmpSecretKey"],
-            "session_token":     cred["Token"],
-            "expired_at":        data["data"].get("ExpiredTime", ""),
+            "access_key_id":     cred["accessKeyId"],
+            "secret_access_key": cred["secretAccessKey"],
+            "session_token":     cred["sessionToken"],
+            "s3_bucket":         bucket_info["s3Bucket"],
+            "s3_endpoint":       bucket_info["s3Endpoint"],
         }
 
 
@@ -257,17 +258,17 @@ class dogecloud_uploader:
         初始化 boto3 S3 客户端。
 
         参数：
-            cfg       配置 dict（含 endpoint、bucket、region）
-            tmp_cred  临时凭证 dict（含 access_key_id、secret_access_key、session_token）
+            cfg       配置 dict（含 region，可选，默认 ap-chengdu）
+            tmp_cred  临时凭证 dict（含 access_key_id、secret_access_key、session_token、s3_bucket、s3_endpoint）
 
         示例：
             uploader = dogecloud_uploader(cfg, cred)
         """
-        self._bucket = cfg["bucket"]
+        self._bucket = tmp_cred["s3_bucket"]
         self._client = boto3.client(
             "s3",
-            endpoint_url=cfg["endpoint"],
-            region_name=cfg["region"],
+            endpoint_url=tmp_cred["s3_endpoint"],
+            region_name=cfg.get("region", "ap-chengdu"),
             aws_access_key_id=tmp_cred["access_key_id"],
             aws_secret_access_key=tmp_cred["secret_access_key"],
             aws_session_token=tmp_cred["session_token"],
