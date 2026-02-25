@@ -75,6 +75,8 @@ has_path_block() {
 
 # write_path_block: append a PATH block to the shell RC file (idempotent)
 # Uses printf instead of heredoc for curl|bash pipe compatibility.
+# Adds a leading blank line only when the file is non-empty, to avoid
+# writing a spurious blank line at the top of a fresh RC file.
 # Args: $1 = block start marker, $2 = block end marker, $3 = block content lines
 write_path_block() {
     local start="$1"
@@ -88,7 +90,11 @@ write_path_block() {
     fi
 
     touch "$SHELL_RC"
-    printf '\n%s\n%s\n%s\n' "$start" "$content" "$end" >> "$SHELL_RC"
+    if [ -s "$SHELL_RC" ]; then
+        printf '\n%s\n%s\n%s\n' "$start" "$content" "$end" >> "$SHELL_RC"
+    else
+        printf '%s\n%s\n%s\n' "$start" "$content" "$end" >> "$SHELL_RC"
+    fi
     echo -e "  ${GREEN}✓${NC} Written PATH block to ${display}"
 }
 
@@ -112,8 +118,14 @@ do_install_brew() {
     echo -e "${BLUE}Installing Homebrew from official installer...${NC}"
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-    # Activate brew in current session (Apple Silicon or Intel Mac)
-    eval "$(/opt/homebrew/bin/brew shellenv)" 2>/dev/null || eval "$(/usr/local/bin/brew shellenv)" 2>/dev/null || true
+    # Activate brew in current session.
+    # Use [ -x ] to check binary existence before eval to avoid spurious
+    # "No such file or directory" stderr on mismatched architectures.
+    if [ -x /opt/homebrew/bin/brew ]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [ -x /usr/local/bin/brew ]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
 
     if command -v brew &> /dev/null; then
         echo -e "${GREEN}[Success] Homebrew installed: $(brew --version | head -1)${NC}"
@@ -145,6 +157,10 @@ do_install_git() {
         fi
         brew install git
     else
+        if ! command -v apt-get &> /dev/null; then
+            echo -e "${RED}[Error] apt-get not found. Only Debian/Ubuntu Linux is supported.${NC}"
+            return 1
+        fi
         sudo apt-get update -qq
         sudo apt-get install -y git
     fi
@@ -174,6 +190,10 @@ do_install_python() {
         fi
         brew install python3
     else
+        if ! command -v apt-get &> /dev/null; then
+            echo -e "${RED}[Error] apt-get not found. Only Debian/Ubuntu Linux is supported.${NC}"
+            return 1
+        fi
         sudo apt-get update -qq
         sudo apt-get install -y python3 python3-pip python3-venv
     fi
@@ -293,10 +313,11 @@ do_install_go() {
             return 1
         fi
 
-        # Extract to a temp dir first; only replace the existing install on success
+        # Extract to a temp dir on the same filesystem as $HOME to enable
+        # atomic mv (avoids cross-device copy when /tmp is a separate partition).
         echo -e "${BLUE}Extracting Go ${GO_VERSION}...${NC}"
         local tmp_dir
-        tmp_dir=$(mktemp -d)
+        tmp_dir=$(TMPDIR="$HOME" mktemp -d)
         if ! tar -xzf "$tmp_go" -C "$tmp_dir" --strip-components=1; then
             echo -e "${RED}[Error] Failed to extract Go archive. Existing installation preserved.${NC}"
             rm -f "$tmp_go"
@@ -305,7 +326,7 @@ do_install_go() {
         fi
         rm -f "$tmp_go"
 
-        # Extraction succeeded — now safely replace the old install
+        # Extraction succeeded — atomically replace the old install
         rm -rf "$GO_INSTALL_DIR"
         mv "$tmp_dir" "$GO_INSTALL_DIR"
         echo -e "  ${GREEN}✓${NC} Installed to ${GO_INSTALL_DIR}"
@@ -368,16 +389,29 @@ do_install_all() {
         echo -e "${CYAN}Installing: Git + Python3 + Node.js + Go + PyTools Dir${NC}\n"
     fi
 
-    do_install_brew   || true
-    do_install_git    || true
-    do_install_python || true
-    do_install_node   || true
-    do_install_go     || true
-    do_setup_pytools  || true
+    # Track per-step result (0 = ok, 1 = failed) for the summary
+    local brew_rc=0 git_rc=0 python_rc=0 node_rc=0 go_rc=0 pytools_rc=0
+    do_install_brew   || brew_rc=1
+    do_install_git    || git_rc=1
+    do_install_python || python_rc=1
+    do_install_node   || node_rc=1
+    do_install_go     || go_rc=1
+    do_setup_pytools  || pytools_rc=1
 
     local SHELL_RC_DISPLAY="${SHELL_RC/#$HOME/~}"
-    echo -e "\n${GREEN}[Success] All done!${NC}"
-    echo -e "${YELLOW}[Reminder] To apply PATH changes in your current terminal:${NC}"
+
+    echo -e "\n${CYAN}========================================${NC}"
+    echo -e "${CYAN}  Summary${NC}"
+    echo -e "${CYAN}========================================${NC}"
+    [ "$brew_rc"    -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Homebrew"    || echo -e "  ${RED}✗${NC}  Homebrew"
+    [ "$git_rc"     -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Git"          || echo -e "  ${RED}✗${NC}  Git"
+    [ "$python_rc"  -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Python3"      || echo -e "  ${RED}✗${NC}  Python3"
+    [ "$node_rc"    -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Node.js"      || echo -e "  ${RED}✗${NC}  Node.js"
+    [ "$go_rc"      -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Go"           || echo -e "  ${RED}✗${NC}  Go"
+    [ "$pytools_rc" -eq 0 ] && echo -e "  ${GREEN}✓${NC}  PyTools Dir"  || echo -e "  ${RED}✗${NC}  PyTools Dir"
+    echo -e "${CYAN}========================================${NC}"
+
+    echo -e "\n${YELLOW}[Reminder] To apply PATH changes in your current terminal:${NC}"
     echo -e "  ${CYAN}source ${SHELL_RC_DISPLAY}${NC}"
 }
 
