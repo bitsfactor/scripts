@@ -44,6 +44,7 @@ import hashlib
 import mimetypes
 import argparse
 from pathlib import Path
+from botocore.config import Config
 
 
 # ============================================================
@@ -272,6 +273,7 @@ class dogecloud_uploader:
             aws_access_key_id=tmp_cred["access_key_id"],
             aws_secret_access_key=tmp_cred["secret_access_key"],
             aws_session_token=tmp_cred["session_token"],
+            config=Config(s3={"addressing_style": "virtual"}),
         )
 
     def upload_file(self, local_path, cdn_key):
