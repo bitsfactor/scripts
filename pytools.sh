@@ -160,10 +160,22 @@ do_install() {
         return 1
     fi
     echo -e "  ${GREEN}✓${NC} $(python3 --version)"
-    if ! python3 -m venv --help &>/dev/null; then
-        echo -e "${RED}[Error] python3-venv is not available.${NC}"
-        echo -e "${YELLOW}On Debian/Ubuntu, run: sudo apt-get install python3-venv${NC}"
-        return 1
+    if ! python3 -c "import ensurepip" &>/dev/null; then
+        if [ "$OS_TYPE" = "linux" ] && command -v apt-get &>/dev/null; then
+            echo -e "  ${YELLOW}python3-venv not found. Installing...${NC}"
+            local SUDO=""
+            [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+            $SUDO apt-get update -qq || return 1
+            if ! $SUDO apt-get install -y python3-venv --quiet; then
+                echo -e "  ${RED}[Error] Failed to install python3-venv.${NC}"
+                return 1
+            fi
+            echo -e "  ${GREEN}✓${NC} python3-venv installed"
+        else
+            echo -e "${RED}[Error] python3-venv is not available.${NC}"
+            echo -e "${YELLOW}On Debian/Ubuntu, run: sudo apt-get install python3-venv${NC}"
+            return 1
+        fi
     fi
 
     # Step 2/6: Create ~/pytools/
@@ -190,6 +202,7 @@ do_install() {
     echo -e "\n${BLUE}[Step 4/6] Creating virtual environment...${NC}"
     if ! python3 -m venv "$VENV_DIR"; then
         echo -e "  ${RED}[Error] Failed to create virtual environment.${NC}"
+        echo -e "  ${YELLOW}On Debian/Ubuntu, run: sudo apt-get install python3-venv${NC}"
         return 1
     fi
     echo -e "  ${GREEN}✓${NC} Venv created: ~/pytools/.venv/"

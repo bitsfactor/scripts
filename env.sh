@@ -176,6 +176,19 @@ do_install_python() {
 
     if command -v python3 &> /dev/null; then
         echo -e "${GREEN}[Skip] Python3 is already installed: $(python3 --version)${NC}"
+        # On Linux, also ensure python3-venv is installed
+        if [ "$OS_TYPE" = "linux" ] && ! python3 -c "import ensurepip" &>/dev/null; then
+            echo -e "${BLUE}Installing python3-venv...${NC}"
+            if ! command -v apt-get &> /dev/null; then
+                echo -e "${RED}[Error] apt-get not found. Cannot install python3-venv.${NC}"
+                return 1
+            fi
+            local SUDO=""
+            [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+            $SUDO apt-get update -qq                    || return 1
+            $SUDO apt-get install -y python3-venv       || return 1
+            echo -e "${GREEN}[Success] python3-venv installed${NC}"
+        fi
         return 0
     fi
 
