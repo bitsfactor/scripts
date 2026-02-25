@@ -188,7 +188,10 @@ do_install() {
 
     # Step 4/6: Create virtual environment
     echo -e "\n${BLUE}[Step 4/6] Creating virtual environment...${NC}"
-    python3 -m venv "$VENV_DIR"
+    if ! python3 -m venv "$VENV_DIR"; then
+        echo -e "  ${RED}[Error] Failed to create virtual environment.${NC}"
+        return 1
+    fi
     echo -e "  ${GREEN}✓${NC} Venv created: ~/pytools/.venv/"
 
     # Step 5/6: Install Python dependencies into venv
