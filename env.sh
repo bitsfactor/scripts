@@ -57,25 +57,16 @@ GO_BLOCK_END="# <<< BitsFactor go SDK PATH"
 
 # ---- Shared functions ----
 
-# sed_inplace: cross-platform sed -i wrapper
-# Args: $1 = sed expression, $2 = file path
-sed_inplace() {
-    if [ "$OS_TYPE" = "macos" ]; then
-        sed -i '' "$1" "$2"
-    else
-        sed -i "$1" "$2"
-    fi
-}
-
 # has_path_block: check if a PATH block marker already exists in any shell config
 # Scans ~/.zshrc, ~/.bashrc, ~/.bash_profile to prevent duplicate writes.
+# Uses -F (fixed string) to avoid regex interpretation of marker text.
 # Args: $1 = block start marker string
 # Returns: 0 if found, 1 if not found
 has_path_block() {
     local marker="$1"
     local configs=("$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile")
     for cfg in "${configs[@]}"; do
-        if [ -f "$cfg" ] && grep -q "$marker" "$cfg" 2>/dev/null; then
+        if [ -f "$cfg" ] && grep -qF "$marker" "$cfg" 2>/dev/null; then
             return 0
         fi
     done
@@ -149,7 +140,7 @@ do_install_git() {
     if [ "$OS_TYPE" = "macos" ]; then
         if ! command -v brew &> /dev/null; then
             echo -e "${RED}[Error] Homebrew is required to install Git on macOS.${NC}"
-            echo -e "${YELLOW}Please run option 2) Install Homebrew first.${NC}"
+            echo -e "${YELLOW}Please install Homebrew first (run this script and select 'Install Homebrew').${NC}"
             return 1
         fi
         brew install git
@@ -178,7 +169,7 @@ do_install_python() {
     if [ "$OS_TYPE" = "macos" ]; then
         if ! command -v brew &> /dev/null; then
             echo -e "${RED}[Error] Homebrew is required to install Python3 on macOS.${NC}"
-            echo -e "${YELLOW}Please run option 2) Install Homebrew first.${NC}"
+            echo -e "${YELLOW}Please install Homebrew first (run this script and select 'Install Homebrew').${NC}"
             return 1
         fi
         brew install python3
@@ -207,15 +198,15 @@ do_install_node() {
     if [ "$OS_TYPE" = "macos" ]; then
         if ! command -v brew &> /dev/null; then
             echo -e "${RED}[Error] Homebrew is required to install Node.js on macOS.${NC}"
-            echo -e "${YELLOW}Please run option 2) Install Homebrew first.${NC}"
+            echo -e "${YELLOW}Please install Homebrew first (run this script and select 'Install Homebrew').${NC}"
             return 1
         fi
         brew install node
     else
-        # Linux: install via nvm
-        local NVM_HOME="$HOME/.nvm"
+        # Linux: install via nvm; use NVM_DIR (standard nvm variable) throughout
+        export NVM_DIR="$HOME/.nvm"
 
-        if [ ! -f "$NVM_HOME/nvm.sh" ]; then
+        if [ ! -f "$NVM_DIR/nvm.sh" ]; then
             echo -e "${BLUE}Downloading nvm v0.39.7...${NC}"
             local tmp_nvm
             tmp_nvm=$(mktemp)
@@ -227,11 +218,10 @@ do_install_node() {
             bash "$tmp_nvm"
             rm -f "$tmp_nvm"
         else
-            echo -e "${YELLOW}[Skip] nvm already downloaded at ${NVM_HOME}${NC}"
+            echo -e "${YELLOW}[Skip] nvm already downloaded at ${NVM_DIR}${NC}"
         fi
 
         # Activate nvm in current session
-        export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
         echo -e "${BLUE}Installing Node.js LTS...${NC}"
@@ -239,7 +229,7 @@ do_install_node() {
         nvm use --lts
 
         # Write nvm init block only if no NVM_DIR line exists yet in shell RC
-        if ! grep -q 'NVM_DIR' "$SHELL_RC" 2>/dev/null; then
+        if ! grep -qF 'NVM_DIR' "$SHELL_RC" 2>/dev/null; then
             local nvm_content
             nvm_content='export NVM_DIR="$HOME/.nvm"'
             nvm_content="${nvm_content}"$'\n''[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'
@@ -270,7 +260,7 @@ do_install_go() {
     if [ "$OS_TYPE" = "macos" ]; then
         if ! command -v brew &> /dev/null; then
             echo -e "${RED}[Error] Homebrew is required to install Go on macOS.${NC}"
-            echo -e "${YELLOW}Please run option 2) Install Homebrew first.${NC}"
+            echo -e "${YELLOW}Please install Homebrew first (run this script and select 'Install Homebrew').${NC}"
             return 1
         fi
         brew install go
@@ -303,16 +293,22 @@ do_install_go() {
             return 1
         fi
 
-        echo -e "${BLUE}Extracting to ${GO_INSTALL_DIR}...${NC}"
-        rm -rf "$GO_INSTALL_DIR"
-        mkdir -p "$GO_INSTALL_DIR"
-        if ! tar -xzf "$tmp_go" -C "$GO_INSTALL_DIR" --strip-components=1; then
-            echo -e "${RED}[Error] Failed to extract Go archive.${NC}"
+        # Extract to a temp dir first; only replace the existing install on success
+        echo -e "${BLUE}Extracting Go ${GO_VERSION}...${NC}"
+        local tmp_dir
+        tmp_dir=$(mktemp -d)
+        if ! tar -xzf "$tmp_go" -C "$tmp_dir" --strip-components=1; then
+            echo -e "${RED}[Error] Failed to extract Go archive. Existing installation preserved.${NC}"
             rm -f "$tmp_go"
-            rm -rf "$GO_INSTALL_DIR"
+            rm -rf "$tmp_dir"
             return 1
         fi
         rm -f "$tmp_go"
+
+        # Extraction succeeded — now safely replace the old install
+        rm -rf "$GO_INSTALL_DIR"
+        mv "$tmp_dir" "$GO_INSTALL_DIR"
+        echo -e "  ${GREEN}✓${NC} Installed to ${GO_INSTALL_DIR}"
 
         # Write PATH block
         local go_content
@@ -337,7 +333,7 @@ do_setup_pytools() {
 
     if ! command -v python3 &> /dev/null; then
         echo -e "${RED}[Error] Python3 is not installed.${NC}"
-        echo -e "${YELLOW}Please run option 4) Install Python3 first.${NC}"
+        echo -e "${YELLOW}Please install Python3 first (run this script and select 'Install Python3').${NC}"
         return 1
     fi
 
@@ -366,7 +362,11 @@ do_setup_pytools() {
 
 do_install_all() {
     echo -e "\n${BLUE}=== Install All ===${NC}"
-    echo -e "${CYAN}Installing: Brew + Git + Python3 + Node.js + Go + PyTools Dir${NC}\n"
+    if [ "$OS_TYPE" = "macos" ]; then
+        echo -e "${CYAN}Installing: Brew + Git + Python3 + Node.js + Go + PyTools Dir${NC}\n"
+    else
+        echo -e "${CYAN}Installing: Git + Python3 + Node.js + Go + PyTools Dir${NC}\n"
+    fi
 
     do_install_brew   || true
     do_install_git    || true
@@ -390,7 +390,11 @@ echo -e "Detected OS:   ${CYAN}${OS_TYPE}${NC}"
 echo -e "Shell config:  ${CYAN}${SHELL_RC/#$HOME/~}${NC}\n"
 
 echo -e "${CYAN}Select an option:${NC}"
-echo -e "  ${GREEN}1)${NC} Install All  (Brew + Git + Python3 + Node.js + Go + PyTools Dir)"
+if [ "$OS_TYPE" = "macos" ]; then
+    echo -e "  ${GREEN}1)${NC} Install All  (Brew + Git + Python3 + Node.js + Go + PyTools Dir)"
+else
+    echo -e "  ${GREEN}1)${NC} Install All  (Git + Python3 + Node.js + Go + PyTools Dir)"
+fi
 echo -e "  ${GREEN}2)${NC} Install Homebrew  ${YELLOW}[macOS only]${NC}"
 echo -e "  ${GREEN}3)${NC} Install Git"
 echo -e "  ${GREEN}4)${NC} Install Python3"
