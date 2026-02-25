@@ -10,7 +10,13 @@ The fastest way to set up GitHub SSH access across all your machines. Designed f
 - **2) Set Key** — Run on any new VPS or Mac. Paste your private key and the script handles the rest. Once done, you can `git clone` private repos immediately.
 
 ```bash
+# 国际线路
 curl -s https://cdn.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
+
+# 国内加速（三选一，哪个快用哪个）
+curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
+curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
+curl -s https://ghproxy.net/https://raw.githubusercontent.com/bitsfactor/scripts/main/git.sh | bash
 ```
 
 ## claude.sh — Claude Code Setup
@@ -22,5 +28,11 @@ Install / update, configure, or uninstall Claude Code.
 - **3) Uninstall** — Remove Claude Code and all its config files. You can also choose to only clear config while keeping the program.
 
 ```bash
+# 国际线路
 curl -s https://cdn.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
+
+# 国内加速（三选一，哪个快用哪个）
+curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
+curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
+curl -s https://ghproxy.net/https://raw.githubusercontent.com/bitsfactor/scripts/main/claude.sh | bash
 ```
