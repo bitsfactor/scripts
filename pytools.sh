@@ -49,6 +49,7 @@ CDN_BASE="https://cdn.jsdelivr.net/gh/bitsfactor/scripts@main/pytools"
 PYTOOLS_DIR="$HOME/pytools"
 PYTOOLS_FILES=("dogecloud.py")
 PYTOOLS_DEPS=("requests" "boto3")
+VENV_DIR="$PYTOOLS_DIR/.venv"
 PYTOOLS_BLOCK_START="# >>> BitsFactor pytools PATH"
 PYTOOLS_BLOCK_END="# <<< BitsFactor pytools PATH"
 
@@ -136,7 +137,7 @@ make_wrapper() {
     local tool_name="${py_file%.py}"
     local wrapper_path="$PYTOOLS_DIR/$tool_name"
 
-    printf '#!/bin/bash\nSCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"\nexec python3 "$SCRIPT_DIR/%s" "$@"\n' "$py_file" > "$wrapper_path"
+    printf '#!/bin/bash\nSCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"\nexec "$SCRIPT_DIR/.venv/bin/python3" "$SCRIPT_DIR/%s" "$@"\n' "$py_file" > "$wrapper_path"
     chmod +x "$wrapper_path"
     echo -e "  ${GREEN}✓${NC} Wrapper created: ~/pytools/${tool_name}"
 }
@@ -151,22 +152,27 @@ do_install() {
     echo -e "\n${BLUE}=== Install / Update PyTools ===${NC}"
     echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}"
 
-    # Step 1/5: Check python3
-    echo -e "\n${BLUE}[Step 1/5] Checking python3...${NC}"
+    # Step 1/6: Check python3
+    echo -e "\n${BLUE}[Step 1/6] Checking python3...${NC}"
     if ! command -v python3 &> /dev/null; then
         echo -e "${RED}[Error] python3 is not installed.${NC}"
         echo -e "${YELLOW}Please install Python3 first (e.g. via env.sh).${NC}"
         return 1
     fi
     echo -e "  ${GREEN}✓${NC} $(python3 --version)"
+    if ! python3 -m venv --help &>/dev/null; then
+        echo -e "${RED}[Error] python3-venv is not available.${NC}"
+        echo -e "${YELLOW}On Debian/Ubuntu, run: sudo apt-get install python3-venv${NC}"
+        return 1
+    fi
 
-    # Step 2/5: Create ~/pytools/
-    echo -e "\n${BLUE}[Step 2/5] Preparing ~/pytools/ directory...${NC}"
+    # Step 2/6: Create ~/pytools/
+    echo -e "\n${BLUE}[Step 2/6] Preparing ~/pytools/ directory...${NC}"
     mkdir -p "$PYTOOLS_DIR"
     echo -e "  ${GREEN}✓${NC} Directory ready: ${YELLOW}${PYTOOLS_DIR}${NC}"
 
-    # Step 3/5: Download tools and create wrappers
-    echo -e "\n${BLUE}[Step 3/5] Downloading tools...${NC}"
+    # Step 3/6: Download tools and create wrappers
+    echo -e "\n${BLUE}[Step 3/6] Downloading tools...${NC}"
     for py_file in "${PYTOOLS_FILES[@]}"; do
         url="${CDN_BASE}/${py_file}"
         dest="${PYTOOLS_DIR}/${py_file}"
@@ -180,20 +186,22 @@ do_install() {
         make_wrapper "$py_file"
     done
 
-    # Step 4/5: Install Python dependencies
-    echo -e "\n${BLUE}[Step 4/5] Installing Python dependencies...${NC}"
-    echo -e "  Dependencies: ${CYAN}${PYTOOLS_DEPS[*]}${NC}"
-    if ! python3 -m pip install "${PYTOOLS_DEPS[@]}" --quiet 2>/dev/null; then
-        echo -e "  ${YELLOW}Retrying with --user flag...${NC}"
-        if ! python3 -m pip install "${PYTOOLS_DEPS[@]}" --user --quiet; then
-            echo -e "  ${RED}[Error] pip install failed. Please check your Python environment.${NC}"
-            return 1
-        fi
-    fi
-    echo -e "  ${GREEN}✓${NC} Dependencies installed"
+    # Step 4/6: Create virtual environment
+    echo -e "\n${BLUE}[Step 4/6] Creating virtual environment...${NC}"
+    python3 -m venv "$VENV_DIR"
+    echo -e "  ${GREEN}✓${NC} Venv created: ~/pytools/.venv/"
 
-    # Step 5/5: Configure PATH
-    echo -e "\n${BLUE}[Step 5/5] Configuring PATH...${NC}"
+    # Step 5/6: Install Python dependencies into venv
+    echo -e "\n${BLUE}[Step 5/6] Installing Python dependencies into venv...${NC}"
+    echo -e "  Dependencies: ${CYAN}${PYTOOLS_DEPS[*]}${NC}"
+    if ! "$VENV_DIR/bin/pip" install "${PYTOOLS_DEPS[@]}" --quiet; then
+        echo -e "  ${RED}[Error] pip install failed. Please check your Python environment.${NC}"
+        return 1
+    fi
+    echo -e "  ${GREEN}✓${NC} Dependencies installed into venv"
+
+    # Step 6/6: Configure PATH
+    echo -e "\n${BLUE}[Step 6/6] Configuring PATH...${NC}"
     local pytools_content='export PATH="$HOME/pytools:$PATH"'
     write_path_block "$PYTOOLS_BLOCK_START" "$PYTOOLS_BLOCK_END" "$pytools_content"
 
