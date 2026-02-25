@@ -41,7 +41,6 @@ import os
 import json
 import hmac
 import hashlib
-import base64
 import mimetypes
 import argparse
 from pathlib import Path
@@ -190,18 +189,17 @@ class dogecloud_auth:
 
         签名规则：
             待签字符串 = "{path}\n{body}"
-            Signature  = base64(HMAC-SHA1(secret_key, 待签字符串))
+            Signature  = hex(HMAC-SHA1(secret_key, 待签字符串))
 
         示例：
             sig = auth._sign("/oss/tmp/token.json", "bucket=api-01")
         """
         string_to_sign = f"{path}\n{body}"
-        sig = hmac.new(
+        return hmac.new(
             self._secret_key.encode("utf-8"),
             string_to_sign.encode("utf-8"),
             hashlib.sha1,
-        ).digest()
-        return base64.b64encode(sig).decode("utf-8")
+        ).hexdigest()
 
     def get_tmp_credentials(self, bucket):
         """
