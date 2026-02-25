@@ -7,7 +7,7 @@
 #
 # Usage:
 #   bash git.sh
-#   curl -s https://cdn.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
+#   curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
 # =============================================================================
 
 set -e

@@ -7,7 +7,7 @@
 #
 # Usage:
 #   bash claude.sh
-#   curl -s https://cdn.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
+#   curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
 # =============================================================================
 
 set -e

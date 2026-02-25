@@ -4,15 +4,14 @@ A collection of bootstrap scripts for developers. All scripts support **macOS** 
 
 ## env.sh — Development Environment Setup
 
-One-command setup for a complete development environment on any fresh macOS or Linux machine. Installs Homebrew, Git, Python3, Node.js, Go, and a global Python tools directory — each as an independent option or all at once.
+One-command setup for a complete development environment on any fresh macOS or Linux machine. Installs Homebrew, Git, Python3, Node.js, and Go — each as an independent option or all at once.
 
-- **1) Install All** — Runs every step below in sequence: Homebrew (macOS) → Git → Python3 → Node.js → Go → PyTools Dir. Safe to re-run; already-installed tools are skipped.
+- **1) Install All** — Runs every step below in sequence: Homebrew (macOS) → Git → Python3 → Node.js → Go. Safe to re-run; already-installed tools are skipped.
 - **2) Install Homebrew** — macOS only. Installs Homebrew if not present. Skipped silently on Linux.
 - **3) Install Git** — Installs Git via Homebrew (macOS) or `apt-get` (Linux).
 - **4) Install Python3** — Installs Python3 + pip + venv via Homebrew (macOS) or `apt-get` (Linux).
 - **5) Install Node.js & npm** — Installs Node via Homebrew (macOS) or nvm LTS (Linux). Writes nvm init block to shell config.
 - **6) Install Go** — Installs Go via Homebrew (macOS) or downloads the official SDK to `~/.go_sdk` (Linux, no sudo required). Writes `GOROOT`/`PATH` to shell config.
-- **7) Setup Python Global Tools Dir** — Creates `~/pytools` and adds it to `PATH`. Drop any executable Python script there and call it by name from anywhere.
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/env.sh | bash
@@ -69,7 +68,7 @@ curl -s https://ghproxy.net/https://raw.githubusercontent.com/bitsfactor/scripts
 
 One-click deploy Python command-line tools to `~/pytools`. Downloads each tool from CDN, installs Python dependencies, and adds `~/pytools` to `PATH` — so every tool is callable by name from anywhere in the terminal.
 
-- **1) Install / Update** — Downloads all Python tools to `~/pytools`, installs required dependencies via pip (falls back to `--user` if needed), and writes the `~/pytools` PATH block to your shell config.
+- **1) Install / Update** — Downloads all Python tools to `~/pytools`, installs required dependencies into an isolated virtual environment (`~/pytools/.venv/`), and writes the `~/pytools` PATH block to your shell config.
 - **2) Uninstall** — Removes the `~/pytools/` directory and cleans up the PATH block from all shell config files.
 
 ```bash

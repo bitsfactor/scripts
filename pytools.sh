@@ -7,7 +7,7 @@
 #
 # Usage:
 #   bash pytools.sh
-#   curl -s https://cdn.jsdelivr.net/gh/bitsfactor/scripts@main/pytools.sh | bash
+#   curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/pytools.sh | bash
 # =============================================================================
 
 set -e
@@ -45,7 +45,7 @@ esac
 
 # ---- Constants ----
 
-CDN_BASE="https://cdn.jsdelivr.net/gh/bitsfactor/scripts@main/pytools"
+CDN_BASE="https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/pytools"
 PYTOOLS_DIR="$HOME/pytools"
 PYTOOLS_FILES=("dogecloud.py")
 PYTOOLS_DEPS=("requests" "boto3")

@@ -2,13 +2,12 @@
 
 # =============================================================================
 # BitsFactor Environment Setup Tool
-# Auto-configure development environment: Homebrew, Git, Python3, Node.js, Go,
-# and a Python global tools directory (~/pytools).
+# Auto-configure development environment: Homebrew, Git, Python3, Node.js, Go.
 # Supports macOS and Linux (Debian / Ubuntu).
 #
 # Usage:
 #   bash env.sh
-#   curl -s https://cdn.jsdelivr.net/gh/bitsfactor/scripts@main/env.sh | bash
+#   curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/env.sh | bash
 # =============================================================================
 
 set -e
@@ -45,9 +44,6 @@ case "$USER_SHELL" in
 esac
 
 # ---- PATH block marker constants ----
-
-PYTOOLS_BLOCK_START="# >>> BitsFactor pytools PATH"
-PYTOOLS_BLOCK_END="# <<< BitsFactor pytools PATH"
 
 NVM_BLOCK_START="# >>> BitsFactor nvm init"
 NVM_BLOCK_END="# <<< BitsFactor nvm init"
@@ -235,7 +231,7 @@ do_install_node() {
             echo -e "${BLUE}Downloading nvm v0.39.7...${NC}"
             local tmp_nvm
             tmp_nvm=$(mktemp)
-            if ! curl -fsSL "https://cdn.jsdelivr.net/gh/nvm-sh/nvm@v0.39.7/install.sh" -o "$tmp_nvm"; then
+            if ! curl -fsSL "https://fastly.jsdelivr.net/gh/nvm-sh/nvm@v0.39.7/install.sh" -o "$tmp_nvm"; then
                 echo -e "${RED}[Error] Failed to download nvm installer.${NC}"
                 rm -f "$tmp_nvm"
                 return 1
@@ -352,60 +348,27 @@ do_install_go() {
 }
 
 # =============================================================================
-# 6) Setup Python Global Tools Dir (~/pytools)
-# =============================================================================
-
-do_setup_pytools() {
-    echo -e "\n${BLUE}=== Setup Python Global Tools Dir ===${NC}"
-
-    if ! command -v python3 &> /dev/null; then
-        echo -e "${RED}[Error] Python3 is not installed.${NC}"
-        echo -e "${YELLOW}Please install Python3 first (run this script and select 'Install Python3').${NC}"
-        return 1
-    fi
-
-    local PYTOOLS_DIR="$HOME/pytools"
-    mkdir -p "$PYTOOLS_DIR"
-    echo -e "  ${GREEN}✓${NC} Directory ready: ${YELLOW}${PYTOOLS_DIR}${NC}"
-
-    # Write PATH block
-    local pytools_content='export PATH="$HOME/pytools:$PATH"'
-    write_path_block "$PYTOOLS_BLOCK_START" "$PYTOOLS_BLOCK_END" "$pytools_content"
-
-    # Activate in current session
-    export PATH="$HOME/pytools:$PATH"
-
-    echo -e "\n${CYAN}How to use ~/pytools:${NC}"
-    echo -e "  1. Create a Python script:    ${YELLOW}~/pytools/my_tool${NC}"
-    echo -e "  2. Add shebang at top:        ${CYAN}#!/usr/bin/env python3${NC}"
-    echo -e "  3. Make it executable:        ${CYAN}chmod +x ~/pytools/my_tool${NC}"
-    echo -e "  4. Call it from anywhere:     ${CYAN}my_tool${NC}"
-    echo -e "\n${GREEN}[Success] Python global tools directory is ready!${NC}"
-}
-
-# =============================================================================
 # Install All
 # =============================================================================
 
 do_install_all() {
     echo -e "\n${BLUE}=== Install All ===${NC}"
     if [ "$OS_TYPE" = "macos" ]; then
-        echo -e "${CYAN}Installing: Brew + Git + Python3 + Node.js + Go + PyTools Dir${NC}\n"
+        echo -e "${CYAN}Installing: Brew + Git + Python3 + Node.js + Go${NC}\n"
     else
-        echo -e "${CYAN}Installing: Git + Python3 + Node.js + Go + PyTools Dir${NC}\n"
+        echo -e "${CYAN}Installing: Git + Python3 + Node.js + Go${NC}\n"
     fi
 
     # Track per-step result (0 = ok, 1 = failed) for the summary.
     # Each function uses explicit || return 1 on critical commands so that
     # failures are reported accurately on both bash 3.x and bash 5.x,
     # regardless of whether set -e is inherited in the || call context.
-    local brew_rc=0 git_rc=0 python_rc=0 node_rc=0 go_rc=0 pytools_rc=0
+    local brew_rc=0 git_rc=0 python_rc=0 node_rc=0 go_rc=0
     do_install_brew   || brew_rc=1
     do_install_git    || git_rc=1
     do_install_python || python_rc=1
     do_install_node   || node_rc=1
     do_install_go     || go_rc=1
-    do_setup_pytools  || pytools_rc=1
 
     local SHELL_RC_DISPLAY="${SHELL_RC/#$HOME/~}"
 
@@ -420,7 +383,6 @@ do_install_all() {
     [ "$python_rc"  -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Python3"      || echo -e "  ${RED}✗${NC}  Python3"
     [ "$node_rc"    -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Node.js"      || echo -e "  ${RED}✗${NC}  Node.js"
     [ "$go_rc"      -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Go"           || echo -e "  ${RED}✗${NC}  Go"
-    [ "$pytools_rc" -eq 0 ] && echo -e "  ${GREEN}✓${NC}  PyTools Dir"  || echo -e "  ${RED}✗${NC}  PyTools Dir"
     echo -e "${CYAN}========================================${NC}"
 
     echo -e "\n${YELLOW}[Reminder] To apply PATH changes in your current terminal:${NC}"
@@ -437,19 +399,18 @@ echo -e "Shell config:  ${CYAN}${SHELL_RC/#$HOME/~}${NC}\n"
 
 echo -e "${CYAN}Select an option:${NC}"
 if [ "$OS_TYPE" = "macos" ]; then
-    echo -e "  ${GREEN}1)${NC} Install All  (Brew + Git + Python3 + Node.js + Go + PyTools Dir)"
+    echo -e "  ${GREEN}1)${NC} Install All  (Brew + Git + Python3 + Node.js + Go)"
 else
-    echo -e "  ${GREEN}1)${NC} Install All  (Git + Python3 + Node.js + Go + PyTools Dir)"
+    echo -e "  ${GREEN}1)${NC} Install All  (Git + Python3 + Node.js + Go)"
 fi
 echo -e "  ${GREEN}2)${NC} Install Homebrew  ${YELLOW}[macOS only]${NC}"
 echo -e "  ${GREEN}3)${NC} Install Git"
 echo -e "  ${GREEN}4)${NC} Install Python3"
 echo -e "  ${GREEN}5)${NC} Install Node.js & npm"
 echo -e "  ${GREEN}6)${NC} Install Go"
-echo -e "  ${GREEN}7)${NC} Setup Python Global Tools Dir"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
-read -p "Enter option (0-7): " MENU_CHOICE < /dev/tty
+read -p "Enter option (0-6): " MENU_CHOICE < /dev/tty
 
 case "$MENU_CHOICE" in
     1) do_install_all ;;
@@ -458,7 +419,6 @@ case "$MENU_CHOICE" in
     4) do_install_python ;;
     5) do_install_node ;;
     6) do_install_go ;;
-    7) do_setup_pytools ;;
     0|"")
         echo -e "${YELLOW}Exited.${NC}"
         exit 0
