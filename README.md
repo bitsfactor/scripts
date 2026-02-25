@@ -64,3 +64,22 @@ curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
 ```bash
 curl -s https://ghproxy.net/https://raw.githubusercontent.com/bitsfactor/scripts/main/claude.sh | bash
 ```
+
+## pytools.sh — Python Tools Installer
+
+One-click deploy Python command-line tools to `~/pytools`. Downloads each tool from CDN, installs Python dependencies, and adds `~/pytools` to `PATH` — so every tool is callable by name from anywhere in the terminal.
+
+- **1) Install / Update** — Downloads all Python tools to `~/pytools`, installs required dependencies via pip (falls back to `--user` if needed), and writes the `~/pytools` PATH block to your shell config.
+- **2) Uninstall** — Removes the `~/pytools/` directory and cleans up the PATH block from all shell config files.
+
+```bash
+curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/pytools.sh | bash
+```
+
+```bash
+curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/pytools.sh | bash
+```
+
+```bash
+curl -s https://ghproxy.net/https://raw.githubusercontent.com/bitsfactor/scripts/main/pytools.sh | bash
+```
