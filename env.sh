@@ -155,14 +155,17 @@ do_install_git() {
             echo -e "${YELLOW}Please install Homebrew first (run this script and select 'Install Homebrew').${NC}"
             return 1
         fi
-        brew install git
+        brew install git || return 1
     else
         if ! command -v apt-get &> /dev/null; then
             echo -e "${RED}[Error] apt-get not found. Only Debian/Ubuntu Linux is supported.${NC}"
             return 1
         fi
-        sudo apt-get update -qq
-        sudo apt-get install -y git
+        # Use sudo only when not already running as root
+        local SUDO=""
+        [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+        $SUDO apt-get update -qq          || return 1
+        $SUDO apt-get install -y git      || return 1
     fi
 
     echo -e "${GREEN}[Success] $(git --version)${NC}"
@@ -188,14 +191,16 @@ do_install_python() {
             echo -e "${YELLOW}Please install Homebrew first (run this script and select 'Install Homebrew').${NC}"
             return 1
         fi
-        brew install python3
+        brew install python3 || return 1
     else
         if ! command -v apt-get &> /dev/null; then
             echo -e "${RED}[Error] apt-get not found. Only Debian/Ubuntu Linux is supported.${NC}"
             return 1
         fi
-        sudo apt-get update -qq
-        sudo apt-get install -y python3 python3-pip python3-venv
+        local SUDO=""
+        [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+        $SUDO apt-get update -qq                                    || return 1
+        $SUDO apt-get install -y python3 python3-pip python3-venv   || return 1
     fi
 
     echo -e "${GREEN}[Success] $(python3 --version)${NC}"
@@ -221,7 +226,7 @@ do_install_node() {
             echo -e "${YELLOW}Please install Homebrew first (run this script and select 'Install Homebrew').${NC}"
             return 1
         fi
-        brew install node
+        brew install node || return 1
     else
         # Linux: install via nvm; use NVM_DIR (standard nvm variable) throughout
         export NVM_DIR="$HOME/.nvm"
@@ -235,7 +240,8 @@ do_install_node() {
                 rm -f "$tmp_nvm"
                 return 1
             fi
-            bash "$tmp_nvm"
+            # Run installer; clean up temp file regardless of outcome
+            bash "$tmp_nvm" || { rm -f "$tmp_nvm"; echo -e "${RED}[Error] nvm installer failed.${NC}"; return 1; }
             rm -f "$tmp_nvm"
         else
             echo -e "${YELLOW}[Skip] nvm already downloaded at ${NVM_DIR}${NC}"
@@ -245,8 +251,8 @@ do_install_node() {
         [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
         echo -e "${BLUE}Installing Node.js LTS...${NC}"
-        nvm install --lts
-        nvm use --lts
+        nvm install --lts || return 1
+        nvm use --lts     || return 1
 
         # Write nvm init block only if no NVM_DIR line exists yet in shell RC
         if ! grep -qF 'NVM_DIR' "$SHELL_RC" 2>/dev/null; then
@@ -283,7 +289,7 @@ do_install_go() {
             echo -e "${YELLOW}Please install Homebrew first (run this script and select 'Install Homebrew').${NC}"
             return 1
         fi
-        brew install go
+        brew install go || return 1
     else
         # Linux: install to $HOME/.go_sdk (no sudo needed)
         local GO_VERSION="1.23.5"
@@ -389,7 +395,10 @@ do_install_all() {
         echo -e "${CYAN}Installing: Git + Python3 + Node.js + Go + PyTools Dir${NC}\n"
     fi
 
-    # Track per-step result (0 = ok, 1 = failed) for the summary
+    # Track per-step result (0 = ok, 1 = failed) for the summary.
+    # Each function uses explicit || return 1 on critical commands so that
+    # failures are reported accurately on both bash 3.x and bash 5.x,
+    # regardless of whether set -e is inherited in the || call context.
     local brew_rc=0 git_rc=0 python_rc=0 node_rc=0 go_rc=0 pytools_rc=0
     do_install_brew   || brew_rc=1
     do_install_git    || git_rc=1
@@ -403,7 +412,10 @@ do_install_all() {
     echo -e "\n${CYAN}========================================${NC}"
     echo -e "${CYAN}  Summary${NC}"
     echo -e "${CYAN}========================================${NC}"
-    [ "$brew_rc"    -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Homebrew"    || echo -e "  ${RED}✗${NC}  Homebrew"
+    # Homebrew is macOS-only; omit from summary on Linux to avoid confusion
+    if [ "$OS_TYPE" = "macos" ]; then
+        [ "$brew_rc"    -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Homebrew"    || echo -e "  ${RED}✗${NC}  Homebrew"
+    fi
     [ "$git_rc"     -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Git"          || echo -e "  ${RED}✗${NC}  Git"
     [ "$python_rc"  -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Python3"      || echo -e "  ${RED}✗${NC}  Python3"
     [ "$node_rc"    -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Node.js"      || echo -e "  ${RED}✗${NC}  Node.js"
