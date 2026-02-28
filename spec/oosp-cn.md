@@ -2,8 +2,7 @@
 
 ## 核心原则
 - 一文件一类，禁止继承用组合
-- 命名：全小写下划线（如 `user_service`）
-- 类和函数必须有中文注释
+- 类和函数必须有注释
 - 第三方库需包装成类
 
 ## 命名空间
@@ -12,9 +11,10 @@
 
 ## 目录结构
 ```
-{project}/
-├── app/web/cli/    # UI层
-├── api/            # API层 (http/ws/rpc)
+src/
+├── web/            # UI层 - Web界面
+├── cli/            # UI层 - 命令行
+├── api/            # UI层 - 对外服务接口
 ├── business/       # 业务逻辑层
 ├── data/           # 数据访问层
 ├── model/          # 模型层
@@ -24,9 +24,9 @@
 
 ## 分层调用
 ```
-UI → API → Business → Data
-      ↘      ↓      ↙
-      Model / Common
+web/cli/api → business → data
+                 ↓        ↙
+          model / common / config
 ```
 
 ## 分层职责
