@@ -6,8 +6,8 @@
 - 第三方库需包装成类
 
 ## 命名空间
-`{项目}.{分层}.{类名}` → 文件路径
-例：`demo.data.database` → `demo/data/database.js`
+`{分层}.{类名}` → 文件路径
+例：`data.database` → `src/data/database.js`
 
 ## 目录结构
 ```
