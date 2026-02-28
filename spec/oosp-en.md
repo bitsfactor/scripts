@@ -12,6 +12,11 @@ Example: `data.database` → `src/data/database.js`
 ## Directory Structure
 ```
 ├── .env              # Environment variables (keys, passwords, server credentials). Never commit to git.
+├── docs/             # Documentation directory
+│   ├── design.md           # Original design document
+│   ├── current_status.md   # Current status document, manually updated during AI-assisted development.
+│   ├── scripts.md          # Project scripts manual. How to operate the project via scripts.
+│   └── api.md              # API manual for client callers.
 ├── scripts/          # Shell utility scripts.
 │   └── setup.sh      # Interactive setup script. Subcommands: install, configure, deploy, update, etc.
 ├── test/             # Test directory
@@ -35,5 +40,6 @@ web/cli/api → business → data
 ```
 
 ## Key Rules
+- Use English (comments, conversations)
 - Model layer holds data only, no behavior functions
 - Public functions of Business layer classes must have unit tests. Lower layers don't require tests. Upper layers don't mandate tests.
