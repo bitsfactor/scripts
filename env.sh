@@ -438,11 +438,12 @@ do_install_oosp() {
     # ---- Step 1: Remove existing OOSP (CN and EN, markers and old format) ----
     echo -e "\n${BLUE}[Step 1/3] Scanning for existing OOSP content...${NC}"
 
+    local cleaned
     for file in "$GLOBAL_CLAUDE" "$PROJECT_CLAUDE"; do
         if [ ! -f "$file" ]; then
             continue
         fi
-        local cleaned=false
+        cleaned=false
 
         # New format: marker-based blocks
         if grep -qF "$OOSP_CN_START" "$file" 2>/dev/null; then
