@@ -245,7 +245,9 @@ repair_settings_json() {
         close_braces=$(awk '{n+=gsub(/}/,"")} END{print n+0}' "$tmp")
         open_brackets=$(awk '{n+=gsub(/\[/,"")} END{print n+0}' "$tmp")
         close_brackets=$(awk '{n+=gsub(/\]/,"")} END{print n+0}' "$tmp")
-        [ "$open_braces" -ne "$close_braces" ] || [ "$open_brackets" -ne "$close_brackets" ] && is_valid_json=false
+        if [ "$open_braces" -ne "$close_braces" ] || [ "$open_brackets" -ne "$close_brackets" ]; then
+            is_valid_json=false
+        fi
     fi
 
     if [ "$is_valid_json" = false ]; then

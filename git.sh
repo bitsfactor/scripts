@@ -148,7 +148,7 @@ do_set_key() {
     echo -e "${BLUE}[Step 3/4] Generating matching public key...${NC}"
     if ! ssh-keygen -y -f "$KEY_FILE" > "${KEY_FILE}.pub" 2>/dev/null; then
         echo -e "${RED}[Error] Invalid private key. Please check the key content and try again.${NC}"
-        rm -f "${KEY_FILE}.pub"
+        rm -f "${KEY_FILE}.pub" "$KEY_FILE"
         return 1
     fi
     chmod 644 "${KEY_FILE}.pub"
