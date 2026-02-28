@@ -415,10 +415,8 @@ do_install_all() {
 do_install_oosp() {
     echo -e "\n${BLUE}=== Install / Update OOSP ===${NC}"
 
-    local OOSP_CN_START="# >>> BitsFactor OOSP CN"
-    local OOSP_CN_END="# <<< BitsFactor OOSP CN"
-    local OOSP_EN_START="# >>> BitsFactor OOSP EN"
-    local OOSP_EN_END="# <<< BitsFactor OOSP EN"
+    local OOSP_START="# OOSP (Object-Oriented Standardized Programming)"
+    local OOSP_END="# OOSP END"
 
     local GLOBAL_CLAUDE="$HOME/.claude/CLAUDE.md"
     local PROJECT_CLAUDE="$(pwd)/CLAUDE.md"
@@ -435,7 +433,7 @@ do_install_oosp() {
         fi
     }
 
-    # ---- Step 1: Remove existing OOSP (CN and EN, markers and old format) ----
+    # ---- Step 1: Remove existing OOSP ----
     echo -e "\n${BLUE}[Step 1/3] Scanning for existing OOSP content...${NC}"
 
     local cleaned
@@ -445,28 +443,8 @@ do_install_oosp() {
         fi
         cleaned=false
 
-        # New format: marker-based blocks
-        if grep -qF "$OOSP_CN_START" "$file" 2>/dev/null; then
-            _sed_inplace "/$OOSP_CN_START/,/$OOSP_CN_END/d" "$file"
-            cleaned=true
-        fi
-        if grep -qF "$OOSP_EN_START" "$file" 2>/dev/null; then
-            _sed_inplace "/$OOSP_EN_START/,/$OOSP_EN_END/d" "$file"
-            cleaned=true
-        fi
-
-        # Old format: no markers, detect by OOSP title heading.
-        # Delete from the heading line until the next top-level "# " heading (or EOF).
-        if grep -qF "# OOSP 规范" "$file" 2>/dev/null || \
-           grep -qF "# OOSP Specification" "$file" 2>/dev/null; then
-            local tmp
-            tmp=$(mktemp)
-            awk '
-                /^# OOSP 规范/ || /^# OOSP Specification/ { in_oosp = 1; next }
-                in_oosp && /^# /                           { in_oosp = 0 }
-                !in_oosp                                   { print }
-            ' "$file" > "$tmp"
-            mv "$tmp" "$file"
+        if grep -qF "$OOSP_START" "$file" 2>/dev/null; then
+            _sed_inplace "/$OOSP_START/,/$OOSP_END/d" "$file"
             cleaned=true
         fi
 
@@ -511,10 +489,10 @@ do_install_oosp() {
     echo ""
     read -p "Enter option (0/1/2): " LANG_CHOICE < /dev/tty
 
-    local CDN_URL="" BLOCK_START="" BLOCK_END=""
+    local CDN_URL=""
     case "$LANG_CHOICE" in
-        1) CDN_URL="$CDN_CN"; BLOCK_START="$OOSP_CN_START"; BLOCK_END="$OOSP_CN_END" ;;
-        2) CDN_URL="$CDN_EN"; BLOCK_START="$OOSP_EN_START"; BLOCK_END="$OOSP_EN_END" ;;
+        1) CDN_URL="$CDN_CN" ;;
+        2) CDN_URL="$CDN_EN" ;;
         0|"")
             echo -e "${YELLOW}Cancelled.${NC}"
             unset -f _sed_inplace
@@ -540,9 +518,9 @@ do_install_oosp() {
     touch "$TARGET_FILE"
 
     if [ -s "$TARGET_FILE" ]; then
-        printf '\n%s\n%s\n%s\n' "$BLOCK_START" "$oosp_content" "$BLOCK_END" >> "$TARGET_FILE"
+        printf '\n%s\n%s\n' "$oosp_content" "$OOSP_END" >> "$TARGET_FILE"
     else
-        printf '%s\n%s\n%s\n' "$BLOCK_START" "$oosp_content" "$BLOCK_END" >> "$TARGET_FILE"
+        printf '%s\n%s\n' "$oosp_content" "$OOSP_END" >> "$TARGET_FILE"
     fi
 
     local display="${TARGET_FILE/#$HOME/~}"

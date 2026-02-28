@@ -1,4 +1,4 @@
-# OOSP Specification (Object-Oriented Standardized Programming)
+# OOSP (Object-Oriented Standardized Programming)
 
 ## Core Principles
 - One file per class; no inheritance, use composition

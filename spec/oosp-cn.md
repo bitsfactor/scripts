@@ -1,4 +1,4 @@
-# OOSP 规范 (Object-Oriented Standardized Programming)
+# OOSP (Object-Oriented Standardized Programming)
 
 ## 核心原则
 - 一文件一类，禁止继承用组合
