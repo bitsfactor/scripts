@@ -301,8 +301,14 @@ do_install_go() {
         brew install go || return 1
     else
         # Linux: install to $HOME/.go_sdk (no sudo needed)
-        local GO_VERSION="1.23.5"
         local GO_INSTALL_DIR="$HOME/.go_sdk"
+        # 动态获取最新 Go 版本，失败时降级为固定版本
+        local GO_VERSION
+        GO_VERSION=$(curl -fsSL --max-time 5 "https://go.dev/VERSION?m=text" 2>/dev/null | head -1 | sed 's/^go//')
+        if [ -z "$GO_VERSION" ]; then
+            GO_VERSION="1.23.5"
+            echo -e "  ${YELLOW}[Warning] Could not fetch latest Go version, using fallback: ${GO_VERSION}${NC}"
+        fi
 
         # Detect CPU architecture
         local ARCH

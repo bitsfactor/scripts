@@ -2,37 +2,39 @@
 
 ## Core Principles
 - One file per class; no inheritance, use composition
-- Naming: all lowercase with underscores (e.g. `user_service`)
 - Every class and function must have comments
 - Third-party libraries must be wrapped in a class
 
 ## Namespace
-`{project}.{layer}.{class}` → file path
-Example: `demo.data.database` → `demo/data/database.js`
+`{layer}.{class}` → file path
+Example: `data.database` → `src/data/database.js`
 
 ## Directory Structure
 ```
-{project}/
-├── app/web/cli/    # UI layer
-├── api/            # API layer (http/ws/rpc)
-├── business/       # Business logic layer
-├── data/           # Data access layer
-├── model/          # Model layer
-├── common/         # Common layer
-└── config/         # Configuration
+.env          # Environment variables (keys, passwords, server credentials). Never commit to git.
+scripts/      # Shell utility scripts.
+├── setup.sh         # Interactive setup script. Subcommands: install, configure, deploy, update, etc.
+test/         # Test directory
+├── business/        # Unit tests for the Business layer
+src/          # Source code
+├── web/             # UI layer - Web interface
+├── cli/             # UI layer - Command line
+├── api/             # UI layer - External service interface
+├── business/        # Business logic layer
+├── data/            # Data access layer
+├── model/           # Model layer
+├── common/          # Common layer
+└── config/          # Configuration
 ```
 
 ## Layer Dependencies
 ```
-UI → API → Business → Data
-      ↘      ↓      ↙
-      Model / Common
+web/cli/api → business → data
+                 ↓        ↙
+          model / common / config
 ```
-
-## Layer Responsibilities
-- **API layer**: Organized by protocol; shared logic across protocols goes to Business layer
-- **Data layer**: Data fetching and cleaning only; business logic belongs in Business layer
 
 ## Key Rules
 - No inheritance — use composition
 - Model layer holds data only, no behavior functions
+- Public functions of Business layer classes must have unit tests. Lower layers don't require tests. Upper layers don't mandate tests.

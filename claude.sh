@@ -235,15 +235,21 @@ repair_settings_json() {
         return
     fi
 
-    # 检查大括号和方括号是否配对（gsub 返回替换次数，兼容所有 awk 实现）
-    local open_braces close_braces open_brackets close_brackets
-    open_braces=$(awk '{n+=gsub(/{/,"")} END{print n+0}' "$tmp")
-    close_braces=$(awk '{n+=gsub(/}/,"")} END{print n+0}' "$tmp")
-    open_brackets=$(awk '{n+=gsub(/\[/,"")} END{print n+0}' "$tmp")
-    close_brackets=$(awk '{n+=gsub(/\]/,"")} END{print n+0}' "$tmp")
+    # 检查 JSON 是否有效：优先用 python3 精确解析，不可用时降级为括号计数
+    local is_valid_json=true
+    if command -v python3 &>/dev/null; then
+        python3 -c "import json,sys; json.load(sys.stdin)" < "$tmp" 2>/dev/null || is_valid_json=false
+    else
+        local open_braces close_braces open_brackets close_brackets
+        open_braces=$(awk '{n+=gsub(/{/,"")} END{print n+0}' "$tmp")
+        close_braces=$(awk '{n+=gsub(/}/,"")} END{print n+0}' "$tmp")
+        open_brackets=$(awk '{n+=gsub(/\[/,"")} END{print n+0}' "$tmp")
+        close_brackets=$(awk '{n+=gsub(/\]/,"")} END{print n+0}' "$tmp")
+        [ "$open_braces" -ne "$close_braces" ] || [ "$open_brackets" -ne "$close_brackets" ] && is_valid_json=false
+    fi
 
-    if [ "$open_braces" -ne "$close_braces" ] || [ "$open_brackets" -ne "$close_brackets" ]; then
-        _backup_and_reset "~/.claude/settings.json had mismatched brackets."
+    if [ "$is_valid_json" = false ]; then
+        _backup_and_reset "~/.claude/settings.json had invalid JSON."
         rm -f "$tmp"
         return
     fi
@@ -421,11 +427,11 @@ do_set_api() {
 
     cat >> "$SHELL_RC" << EOF
 
-# >>> Claude Code API config (managed by claude.sh) >>>
+${BLOCK_START}
 export ANTHROPIC_BASE_URL='${INPUT_URL}'
 export ANTHROPIC_AUTH_TOKEN='${INPUT_TOKEN}'
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
-# <<< Claude Code API config <<<
+${BLOCK_END}
 EOF
 
     echo -e "  ${GREEN}✓${NC} Written to ${SHELL_RC_DISPLAY}"

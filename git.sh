@@ -72,20 +72,20 @@ do_get_key() {
     echo -e "${CYAN}=========================================================${NC}\n"
 
     # Auto-detect clipboard command
-    local CLIP_CMD=""
+    local CLIP_CMD=()
     if command -v pbcopy &> /dev/null; then
-        CLIP_CMD="pbcopy"
+        CLIP_CMD=(pbcopy)
     elif command -v xclip &> /dev/null; then
-        CLIP_CMD="xclip -selection clipboard"
+        CLIP_CMD=(xclip -selection clipboard)
     elif command -v wl-copy &> /dev/null; then
-        CLIP_CMD="wl-copy"
+        CLIP_CMD=(wl-copy)
     elif command -v clip.exe &> /dev/null; then
-        CLIP_CMD="clip.exe"
+        CLIP_CMD=(clip.exe)
     fi
 
     # Copy Private Key to clipboard
-    if [ -n "$CLIP_CMD" ]; then
-        cat "$KEY_FILE" | $CLIP_CMD
+    if [ ${#CLIP_CMD[@]} -gt 0 ]; then
+        "${CLIP_CMD[@]}" < "$KEY_FILE"
         echo -e "${GREEN}[Success] Private Key automatically copied to your system clipboard!${NC}"
         echo -e "Next, log into your VPS and run this script again with option 2). Press Cmd+V (or Ctrl+V) to paste when prompted."
     else
@@ -105,36 +105,53 @@ do_set_key() {
     mkdir -p ~/.ssh
     chmod 700 ~/.ssh
 
-    # Warn if key already exists
-    if [ -f ~/.ssh/id_ed25519 ]; then
-        echo -e "\n${YELLOW}[Warning] ~/.ssh/id_ed25519 already exists and will be overwritten.${NC}"
-        read -p "Continue? (y/n): " overwrite_confirm < /dev/tty
-        if [[ ! "$overwrite_confirm" =~ ^[Yy]$ ]]; then
-            echo -e "${RED}[Cancelled] Operation cancelled.${NC}"
-            return
-        fi
-    fi
-
     # Receive the Private Key
     echo -e "\n${YELLOW}=======================================================${NC}"
     echo -e "${YELLOW}Please paste your SSH Private Key below.${NC}"
     echo -e "${YELLOW}Press [Enter] for a new line, then press [Ctrl+D] to save.${NC}"
     echo -e "${YELLOW}=======================================================${NC}\n"
 
-    cat /dev/tty > ~/.ssh/id_ed25519
+    local TMP_KEY
+    TMP_KEY=$(mktemp)
+    chmod 600 "$TMP_KEY"
+    cat /dev/tty > "$TMP_KEY"
 
-    # Set strict permissions
+    if [ ! -s "$TMP_KEY" ]; then
+        echo -e "${RED}[Error] No key data received.${NC}"
+        rm -f "$TMP_KEY"
+        return 1
+    fi
+
+    # Detect key type and determine target filename
+    local KEY_FILE="$HOME/.ssh/id_ed25519"
+    if grep -q "BEGIN RSA PRIVATE KEY" "$TMP_KEY" 2>/dev/null; then
+        KEY_FILE="$HOME/.ssh/id_rsa"
+    fi
+
+    # Warn if key already exists
+    if [ -f "$KEY_FILE" ]; then
+        echo -e "\n${YELLOW}[Warning] ${KEY_FILE/#$HOME/~} already exists and will be overwritten.${NC}"
+        read -p "Continue? (y/n): " overwrite_confirm < /dev/tty
+        if [[ ! "$overwrite_confirm" =~ ^[Yy]$ ]]; then
+            echo -e "${RED}[Cancelled] Operation cancelled.${NC}"
+            rm -f "$TMP_KEY"
+            return
+        fi
+    fi
+
+    # Move to final location with strict permissions
     echo -e "\n${BLUE}[Step 2/4] Applying strict permissions (600)...${NC}"
-    chmod 600 ~/.ssh/id_ed25519
+    mv "$TMP_KEY" "$KEY_FILE"
+    chmod 600 "$KEY_FILE"
 
     # Generate matching public key from private key
     echo -e "${BLUE}[Step 3/4] Generating matching public key...${NC}"
-    if ! ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub 2>/dev/null; then
+    if ! ssh-keygen -y -f "$KEY_FILE" > "${KEY_FILE}.pub" 2>/dev/null; then
         echo -e "${RED}[Error] Invalid private key. Please check the key content and try again.${NC}"
-        rm -f ~/.ssh/id_ed25519.pub
+        rm -f "${KEY_FILE}.pub"
         return 1
     fi
-    chmod 644 ~/.ssh/id_ed25519.pub
+    chmod 644 "${KEY_FILE}.pub"
 
     # Add GitHub to known_hosts
     echo -e "${BLUE}[Step 4/4] Adding GitHub to trusted hosts...${NC}"
