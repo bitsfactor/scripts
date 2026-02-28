@@ -409,6 +409,131 @@ do_install_all() {
 }
 
 # =============================================================================
+# 7) Install / Update OOSP
+# =============================================================================
+
+do_install_oosp() {
+    echo -e "\n${BLUE}=== Install / Update OOSP ===${NC}"
+
+    local OOSP_CN_START="# >>> BitsFactor OOSP CN"
+    local OOSP_CN_END="# <<< BitsFactor OOSP CN"
+    local OOSP_EN_START="# >>> BitsFactor OOSP EN"
+    local OOSP_EN_END="# <<< BitsFactor OOSP EN"
+
+    local GLOBAL_CLAUDE="$HOME/.claude/CLAUDE.md"
+    local PROJECT_CLAUDE="$(pwd)/CLAUDE.md"
+
+    local CDN_CN="https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/spec/oosp-cn.md"
+    local CDN_EN="https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/spec/oosp-en.md"
+
+    # _sed_inplace: cross-platform sed -i wrapper
+    _sed_inplace() {
+        if [ "$OS_TYPE" = "macos" ]; then
+            sed -i '' "$1" "$2"
+        else
+            sed -i "$1" "$2"
+        fi
+    }
+
+    # ---- Step 1: Remove existing OOSP (CN and EN) from both locations ----
+    echo -e "\n${BLUE}[Step 1/3] Scanning for existing OOSP content...${NC}"
+
+    for file in "$GLOBAL_CLAUDE" "$PROJECT_CLAUDE"; do
+        if [ ! -f "$file" ]; then
+            continue
+        fi
+        local cleaned=false
+        if grep -qF "$OOSP_CN_START" "$file" 2>/dev/null; then
+            _sed_inplace "/$OOSP_CN_START/,/$OOSP_CN_END/d" "$file"
+            cleaned=true
+        fi
+        if grep -qF "$OOSP_EN_START" "$file" 2>/dev/null; then
+            _sed_inplace "/$OOSP_EN_START/,/$OOSP_EN_END/d" "$file"
+            cleaned=true
+        fi
+        if [ "$cleaned" = true ]; then
+            echo -e "  ${GREEN}✓${NC} Removed OOSP from ${file/#$HOME/~}"
+        else
+            echo -e "  ${YELLOW}[Skip]${NC} No OOSP markers in ${file/#$HOME/~}"
+        fi
+    done
+
+    # ---- Step 2: Ask user where to write ----
+    echo -e "\n${BLUE}[Step 2/3] Choose target location...${NC}"
+    echo -e "${CYAN}Write OOSP to:${NC}"
+    echo -e "  ${GREEN}1)${NC} User level    (~/.claude/CLAUDE.md)"
+    echo -e "  ${GREEN}2)${NC} Project level (${PROJECT_CLAUDE/#$HOME/~})"
+    echo -e "  ${RED}0)${NC} Cancel"
+    echo ""
+    read -p "Enter option (0/1/2): " LOC_CHOICE < /dev/tty
+
+    local TARGET_FILE=""
+    case "$LOC_CHOICE" in
+        1) TARGET_FILE="$GLOBAL_CLAUDE" ;;
+        2) TARGET_FILE="$PROJECT_CLAUDE" ;;
+        0|"")
+            echo -e "${YELLOW}Cancelled.${NC}"
+            unset -f _sed_inplace
+            return
+            ;;
+        *)
+            echo -e "${RED}[Error] Invalid option: $LOC_CHOICE${NC}"
+            unset -f _sed_inplace
+            return 1
+            ;;
+    esac
+
+    # ---- Step 3: Choose language and fetch ----
+    echo -e "\n${BLUE}[Step 3/3] Choose language and install...${NC}"
+    echo -e "${CYAN}Language:${NC}"
+    echo -e "  ${GREEN}1)${NC} 中文 (oosp-cn.md)"
+    echo -e "  ${GREEN}2)${NC} English (oosp-en.md)"
+    echo -e "  ${RED}0)${NC} Cancel"
+    echo ""
+    read -p "Enter option (0/1/2): " LANG_CHOICE < /dev/tty
+
+    local CDN_URL="" BLOCK_START="" BLOCK_END=""
+    case "$LANG_CHOICE" in
+        1) CDN_URL="$CDN_CN"; BLOCK_START="$OOSP_CN_START"; BLOCK_END="$OOSP_CN_END" ;;
+        2) CDN_URL="$CDN_EN"; BLOCK_START="$OOSP_EN_START"; BLOCK_END="$OOSP_EN_END" ;;
+        0|"")
+            echo -e "${YELLOW}Cancelled.${NC}"
+            unset -f _sed_inplace
+            return
+            ;;
+        *)
+            echo -e "${RED}[Error] Invalid option: $LANG_CHOICE${NC}"
+            unset -f _sed_inplace
+            return 1
+            ;;
+    esac
+
+    echo -e "${BLUE}Fetching OOSP content from CDN...${NC}"
+    local oosp_content
+    oosp_content=$(curl -fsSL "$CDN_URL" 2>/dev/null)
+    if [ -z "$oosp_content" ]; then
+        echo -e "${RED}[Error] Failed to fetch OOSP content from CDN.${NC}"
+        unset -f _sed_inplace
+        return 1
+    fi
+
+    mkdir -p "$(dirname "$TARGET_FILE")"
+    touch "$TARGET_FILE"
+
+    if [ -s "$TARGET_FILE" ]; then
+        printf '\n%s\n%s\n%s\n' "$BLOCK_START" "$oosp_content" "$BLOCK_END" >> "$TARGET_FILE"
+    else
+        printf '%s\n%s\n%s\n' "$BLOCK_START" "$oosp_content" "$BLOCK_END" >> "$TARGET_FILE"
+    fi
+
+    local display="${TARGET_FILE/#$HOME/~}"
+    echo -e "  ${GREEN}✓${NC} OOSP written to ${display}"
+    echo -e "\n${GREEN}[Success] OOSP installed to ${display}!${NC}"
+
+    unset -f _sed_inplace
+}
+
+# =============================================================================
 # Entry menu
 # =============================================================================
 
@@ -427,9 +552,10 @@ echo -e "  ${GREEN}3)${NC} Install Git"
 echo -e "  ${GREEN}4)${NC} Install Python3"
 echo -e "  ${GREEN}5)${NC} Install Node.js & npm"
 echo -e "  ${GREEN}6)${NC} Install Go"
+echo -e "  ${GREEN}7)${NC} Install / Update OOSP"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
-read -p "Enter option (0-6): " MENU_CHOICE < /dev/tty
+read -p "Enter option (0-7): " MENU_CHOICE < /dev/tty
 
 case "$MENU_CHOICE" in
     1) do_install_all ;;
@@ -438,6 +564,7 @@ case "$MENU_CHOICE" in
     4) do_install_python ;;
     5) do_install_node ;;
     6) do_install_go ;;
+    7) do_install_oosp ;;
     0|"")
         echo -e "${YELLOW}Exited.${NC}"
         exit 0
