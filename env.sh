@@ -435,7 +435,7 @@ do_install_oosp() {
         fi
     }
 
-    # ---- Step 1: Remove existing OOSP (CN and EN) from both locations ----
+    # ---- Step 1: Remove existing OOSP (CN and EN, markers and old format) ----
     echo -e "\n${BLUE}[Step 1/3] Scanning for existing OOSP content...${NC}"
 
     for file in "$GLOBAL_CLAUDE" "$PROJECT_CLAUDE"; do
@@ -443,6 +443,8 @@ do_install_oosp() {
             continue
         fi
         local cleaned=false
+
+        # New format: marker-based blocks
         if grep -qF "$OOSP_CN_START" "$file" 2>/dev/null; then
             _sed_inplace "/$OOSP_CN_START/,/$OOSP_CN_END/d" "$file"
             cleaned=true
@@ -451,10 +453,26 @@ do_install_oosp() {
             _sed_inplace "/$OOSP_EN_START/,/$OOSP_EN_END/d" "$file"
             cleaned=true
         fi
+
+        # Old format: no markers, detect by OOSP title heading.
+        # Delete from the heading line until the next top-level "# " heading (or EOF).
+        if grep -qF "# OOSP 规范" "$file" 2>/dev/null || \
+           grep -qF "# OOSP Specification" "$file" 2>/dev/null; then
+            local tmp
+            tmp=$(mktemp)
+            awk '
+                /^# OOSP 规范/ || /^# OOSP Specification/ { in_oosp = 1; next }
+                in_oosp && /^# /                           { in_oosp = 0 }
+                !in_oosp                                   { print }
+            ' "$file" > "$tmp"
+            mv "$tmp" "$file"
+            cleaned=true
+        fi
+
         if [ "$cleaned" = true ]; then
             echo -e "  ${GREEN}✓${NC} Removed OOSP from ${file/#$HOME/~}"
         else
-            echo -e "  ${YELLOW}[Skip]${NC} No OOSP markers in ${file/#$HOME/~}"
+            echo -e "  ${YELLOW}[Skip]${NC} No OOSP content found in ${file/#$HOME/~}"
         fi
     done
 
