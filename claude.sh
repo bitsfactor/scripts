@@ -120,16 +120,21 @@ clean_settings_json() {
         return
     fi
 
-    # 删除包含目标 key 的行
-    # 注意：匹配整个文件而非仅 env 块，因为 CLEAN_VARS 中的 key 名（如 ANTHROPIC_BASE_URL）
-    # 在 settings.json 中不会出现在 env 以外的位置，实际不会误删
+    # 删除包含目标 key 的行（单次 sed 调用，锚定匹配避免误删）
+    local _sed_args=()
     for var in "${CLEAN_VARS[@]}"; do
-        sed_inplace "/\"${var}\"/d" "$file"
+        _sed_args+=(-e "/^[[:space:]]*\"${var}\"[[:space:]]*:/d")
     done
+    if [ "$OS_TYPE" = "macos" ]; then
+        sed -i '' "${_sed_args[@]}" "$file"
+    else
+        sed -i "${_sed_args[@]}" "$file"
+    fi
 
     # 用 awk 修复 JSON 格式：移除空 env 块、修复尾逗号
     local tmp
     tmp=$(mktemp)
+    trap "rm -f '$tmp'" RETURN
 
     awk '
     { lines[NR] = $0 }
@@ -169,7 +174,6 @@ clean_settings_json() {
     # 检查 awk 输出非空，避免用空文件覆盖原文件
     if [ ! -s "$tmp" ]; then
         echo -e "  ${YELLOW}[Warning] Failed to process ~/.claude/settings.json${NC}"
-        rm -f "$tmp"
         return
     fi
 
@@ -177,8 +181,18 @@ clean_settings_json() {
         echo -e "  ${GREEN}✓${NC} Cleaned ~/.claude/settings.json env entries"
     else
         echo -e "  ${YELLOW}[Warning] Failed to update ~/.claude/settings.json${NC}"
-        rm -f "$tmp"
     fi
+}
+
+# _backup_settings_json: backup ~/.claude/settings.json and reset to {}
+# Args: $1 = warning message
+_backup_settings_json() {
+    local file="$HOME/.claude/settings.json"
+    local bak_name="settings.json.bak.$(date +%Y%m%d%H%M%S)"
+    cp "$file" "$HOME/.claude/${bak_name}"
+    echo '{}' > "$file"
+    echo -e "  ${YELLOW}[Warning] $1${NC}"
+    echo -e "  ${YELLOW}Backed up to ${bak_name} and reset to {}.${NC}"
 }
 
 # repair_settings_json: 检测并修复 ~/.claude/settings.json 的 JSON 格式问题
@@ -198,19 +212,10 @@ repair_settings_json() {
         return
     fi
 
-    # _backup_and_reset: 备份原文件并重置为 {}
-    # Args: $1 = 警告信息
-    _backup_and_reset() {
-        local bak_name="settings.json.bak.$(date +%Y%m%d%H%M%S)"
-        cp "$file" "$HOME/.claude/${bak_name}"
-        echo '{}' > "$file"
-        echo -e "  ${YELLOW}[Warning] $1${NC}"
-        echo -e "  ${YELLOW}Backed up to ${bak_name} and reset to {}.${NC}"
-    }
-
     # 文件非空 → 用 awk 修复
     local tmp
     tmp=$(mktemp)
+    trap "rm -f '$tmp'" RETURN
 
     awk '
     # 跳过空行
@@ -238,8 +243,7 @@ repair_settings_json() {
 
     # awk 输出为空（文件全是空白行）→ 视为无法修复，备份并重建
     if [ ! -s "$tmp" ]; then
-        _backup_and_reset "~/.claude/settings.json had no valid content."
-        rm -f "$tmp"
+        _backup_settings_json "~/.claude/settings.json had no valid content."
         return
     fi
 
@@ -249,18 +253,17 @@ repair_settings_json() {
         python3 -c "import json,sys; json.load(sys.stdin)" < "$tmp" 2>/dev/null || is_valid_json=false
     else
         local open_braces close_braces open_brackets close_brackets
-        open_braces=$(awk '{n+=gsub(/{/,"")} END{print n+0}' "$tmp")
-        close_braces=$(awk '{n+=gsub(/}/,"")} END{print n+0}' "$tmp")
-        open_brackets=$(awk '{n+=gsub(/\[/,"")} END{print n+0}' "$tmp")
-        close_brackets=$(awk '{n+=gsub(/\]/,"")} END{print n+0}' "$tmp")
+        read -r open_braces close_braces open_brackets close_brackets < <(awk '
+            {o+=gsub(/{/,""); c+=gsub(/}/,""); ob+=gsub(/\[/,""); cb+=gsub(/\]/,"")}
+            END {print o+0, c+0, ob+0, cb+0}
+        ' "$tmp")
         if [ "$open_braces" -ne "$close_braces" ] || [ "$open_brackets" -ne "$close_brackets" ]; then
             is_valid_json=false
         fi
     fi
 
     if [ "$is_valid_json" = false ]; then
-        _backup_and_reset "~/.claude/settings.json had invalid JSON."
-        rm -f "$tmp"
+        _backup_settings_json "~/.claude/settings.json had invalid JSON."
         return
     fi
 
@@ -268,11 +271,7 @@ repair_settings_json() {
     if ! cmp -s "$file" "$tmp"; then
         mv "$tmp" "$file"
         echo -e "  ${GREEN}✓${NC} Repaired ~/.claude/settings.json (fixed formatting)"
-    else
-        rm -f "$tmp"
     fi
-
-    unset -f _backup_and_reset
 }
 
 # clean_all_shell_configs: clean all known shell config files
@@ -304,15 +303,15 @@ detect_install_method() {
     INSTALL_METHOD=""
     CLAUDE_PATH=""
 
-    if command -v npm &> /dev/null && npm list -g @anthropic-ai/claude-code 2>/dev/null | grep -q "claude-code"; then
+    if command -v npm &> /dev/null && npm list -g --depth=0 @anthropic-ai/claude-code 2>/dev/null | grep -q "claude-code"; then
         INSTALL_METHOD="npm"
         echo -e "Detected: ${CYAN}NPM global install${NC}"
-    elif [ "$OS_TYPE" = "macos" ] && command -v brew &> /dev/null && brew list --cask claude-code 2>/dev/null | grep -q "."; then
+    elif [ "$OS_TYPE" = "macos" ] && command -v brew &> /dev/null && brew list --cask claude-code &>/dev/null; then
         INSTALL_METHOD="homebrew"
         echo -e "Detected: ${CYAN}Homebrew Cask${NC}"
     elif command -v claude &> /dev/null; then
         INSTALL_METHOD="other"
-        CLAUDE_PATH=$(which claude 2>/dev/null || true)
+        CLAUDE_PATH=$(command -v claude)
         echo -e "Detected: ${CYAN}Official installer / manual${NC}"
         echo -e "Binary path: ${YELLOW}${CLAUDE_PATH}${NC}"
     else
@@ -435,11 +434,16 @@ do_set_api() {
 
     touch "$SHELL_RC"
 
+    # 转义单引号，防止值中含单引号破坏生成的 shell 语句
+    local SAFE_URL SAFE_TOKEN
+    SAFE_URL="${INPUT_URL//\'/\'\\\'\'}"
+    SAFE_TOKEN="${INPUT_TOKEN//\'/\'\\\'\'}"
+
     cat >> "$SHELL_RC" << EOF
 
 ${BLOCK_START}
-export ANTHROPIC_BASE_URL='${INPUT_URL}'
-export ANTHROPIC_AUTH_TOKEN='${INPUT_TOKEN}'
+export ANTHROPIC_BASE_URL='${SAFE_URL}'
+export ANTHROPIC_AUTH_TOKEN='${SAFE_TOKEN}'
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
 ${BLOCK_END}
 EOF
@@ -523,13 +527,12 @@ do_uninstall() {
         fi
     done
 
-    if [ ${#ITEMS_TO_CLEAN[@]} -eq 0 ] && [ -z "$INSTALL_METHOD" ] && [ "$HAS_SHELL_CONFIG" = false ]; then
-        echo -e "\n${GREEN}[Success] No Claude Code installation or config found.${NC}"
-        echo -e "Nothing to clean."
-        return
-    fi
-
     if [ ${#ITEMS_TO_CLEAN[@]} -eq 0 ] && [ "$HAS_SHELL_CONFIG" = false ]; then
+        if [ -z "$INSTALL_METHOD" ]; then
+            echo -e "\n${GREEN}[Success] No Claude Code installation or config found.${NC}"
+            echo -e "Nothing to clean."
+            return
+        fi
         echo -e "  ${YELLOW}(No config files found)${NC}"
     fi
 
@@ -671,7 +674,7 @@ do_uninstall() {
 
     if [ "$USER_CHOICE" = "1" ]; then
         if command -v claude &> /dev/null; then
-            echo -e "  ${RED}✗${NC} claude command still exists: $(which claude)"
+            echo -e "  ${RED}✗${NC} claude command still exists: $(command -v claude)"
             ALL_CLEAN=false
         else
             echo -e "  ${GREEN}✓${NC} claude command removed"
