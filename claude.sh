@@ -51,6 +51,14 @@ BLOCK_END="# <<< Claude Code API"
 
 # ---- Shared functions ----
 
+# tty_read: read one line from /dev/tty
+# Args: $1 = variable name to store result
+#       $2 = (optional) prompt string (written directly to /dev/tty)
+tty_read() {
+    [ -n "$2" ] && printf '%s' "$2" > /dev/tty
+    IFS= read -r "$1" < /dev/tty || true
+}
+
 # sed_inplace: cross-platform sed -i wrapper
 # Args: $1 = sed expression, $2 = file path
 sed_inplace() {
@@ -396,7 +404,7 @@ do_set_api() {
     echo -e "\n${BLUE}[Step 2/5] Enter API configuration...${NC}"
 
     echo -e "${CYAN}Enter ANTHROPIC_BASE_URL (API endpoint):${NC}"
-    read -r INPUT_URL < /dev/tty
+    tty_read INPUT_URL
 
     if [ -z "$INPUT_URL" ]; then
         echo -e "${RED}[Error] API endpoint cannot be empty.${NC}"
@@ -404,7 +412,7 @@ do_set_api() {
     fi
 
     echo -e "${CYAN}Enter ANTHROPIC_AUTH_TOKEN (API key):${NC}"
-    read -r INPUT_TOKEN < /dev/tty
+    tty_read INPUT_TOKEN
 
     if [ -z "$INPUT_TOKEN" ]; then
         echo -e "${RED}[Error] API key cannot be empty.${NC}"
@@ -464,7 +472,7 @@ do_uninstall() {
 
     # ---- Confirmation ----
     echo -e "\n${YELLOW}[Warning] This will uninstall Claude Code and remove related config.${NC}"
-    read -p "Continue? (y/n): " CONFIRM < /dev/tty
+    tty_read CONFIRM "Continue? (y/n): "
     if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
         echo -e "${RED}[Cancelled] Operation cancelled.${NC}"
         return
@@ -536,7 +544,7 @@ do_uninstall() {
         echo -e "  ${YELLOW}2)${NC} Remove config only (keep program)"
         echo -e "  ${RED}0)${NC} Cancel"
         echo ""
-        read -p "Enter option (0/1/2): " USER_CHOICE < /dev/tty
+        tty_read USER_CHOICE "Enter option (0/1/2): "
 
         case "$USER_CHOICE" in
             1) echo -e "${BLUE}Selected: Full uninstall + remove config${NC}" ;;
@@ -552,7 +560,7 @@ do_uninstall() {
         esac
     else
         echo -e "Will clean the items listed above."
-        read -p "Confirm? (y/n): " CONFIRM2 < /dev/tty
+        tty_read CONFIRM2 "Confirm? (y/n): "
         if [[ ! "$CONFIRM2" =~ ^[Yy]$ ]]; then
             echo -e "${RED}[Cancelled] Operation cancelled.${NC}"
             return
@@ -719,7 +727,8 @@ echo -e "  ${GREEN}2)${NC} Set API"
 echo -e "  ${RED}3)${NC} Uninstall Claude Code"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
-read -p "Enter option (0/1/2/3): " MENU_CHOICE < /dev/tty
+stty sane < /dev/tty 2>/dev/null || true
+tty_read MENU_CHOICE "Enter option (0/1/2/3): "
 
 case "$MENU_CHOICE" in
     1) do_install ;;

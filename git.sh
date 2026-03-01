@@ -22,6 +22,14 @@ BLUE='\033[34m'
 CYAN='\033[36m'
 NC='\033[0m'
 
+# tty_read: read one line from /dev/tty
+# Args: $1 = variable name to store result
+#       $2 = (optional) prompt string (written directly to /dev/tty)
+tty_read() {
+    [ -n "$2" ] && printf '%s' "$2" > /dev/tty
+    IFS= read -r "$1" < /dev/tty || true
+}
+
 # =============================================================================
 # 1) Retrieve Keys — detect or generate SSH key pair, copy to clipboard
 # =============================================================================
@@ -41,7 +49,7 @@ do_get_key() {
         echo -e "Found existing rsa key: ${YELLOW}$KEY_FILE${NC}"
     else
         echo -e "${YELLOW}[Notice] No SSH key detected.${NC}"
-        read -p "Would you like to automatically generate a secure ed25519 key? (y/n): " confirm < /dev/tty
+        tty_read confirm "Would you like to automatically generate a secure ed25519 key? (y/n): "
 
         if [[ "$confirm" =~ ^[Yy]$ ]]; then
             KEY_FILE="$HOME/.ssh/id_ed25519"
@@ -131,7 +139,7 @@ do_set_key() {
     # Warn if key already exists
     if [ -f "$KEY_FILE" ]; then
         echo -e "\n${YELLOW}[Warning] ${KEY_FILE/#$HOME/~} already exists and will be overwritten.${NC}"
-        read -p "Continue? (y/n): " overwrite_confirm < /dev/tty
+        tty_read overwrite_confirm "Continue? (y/n): "
         if [[ ! "$overwrite_confirm" =~ ^[Yy]$ ]]; then
             echo -e "${RED}[Cancelled] Operation cancelled.${NC}"
             rm -f "$TMP_KEY"
@@ -185,7 +193,8 @@ echo -e "  ${GREEN}1)${NC} Retrieve Keys (local machine)"
 echo -e "  ${GREEN}2)${NC} Set Key (remote server / Mac)"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
-read -p "Enter option (0/1/2): " MENU_CHOICE < /dev/tty
+stty sane < /dev/tty 2>/dev/null || true
+tty_read MENU_CHOICE "Enter option (0/1/2): "
 
 case "$MENU_CHOICE" in
     1) do_get_key ;;
