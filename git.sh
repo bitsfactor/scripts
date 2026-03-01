@@ -30,6 +30,12 @@ tty_read() {
     IFS= read -r "$1" < /dev/tty || true
 }
 
+# ensure_ssh_dir: create ~/.ssh with correct permissions if not present
+ensure_ssh_dir() {
+    mkdir -p "$HOME/.ssh"
+    chmod 700 "$HOME/.ssh"
+}
+
 # =============================================================================
 # 1) Retrieve Keys — detect or generate SSH key pair, copy to clipboard
 # =============================================================================
@@ -54,12 +60,15 @@ do_get_key() {
         if [[ "$confirm" =~ ^[Yy]$ ]]; then
             KEY_FILE="$HOME/.ssh/id_ed25519"
             local DEFAULT_EMAIL
-            DEFAULT_EMAIL="$(whoami)@$(hostname)"
+            DEFAULT_EMAIL="${USER}@${HOSTNAME}"
 
             echo -e "${BLUE}Generating silently...${NC}"
-            mkdir -p "$HOME/.ssh"
-            chmod 700 "$HOME/.ssh"
-            ssh-keygen -t ed25519 -C "$DEFAULT_EMAIL" -f "$KEY_FILE" -N "" > /dev/null 2>&1
+            ensure_ssh_dir
+            if ! ssh-keygen -t ed25519 -C "$DEFAULT_EMAIL" -f "$KEY_FILE" -N "" > /dev/null 2>&1; then
+                echo -e "${RED}[Error] Key generation failed.${NC}"
+                return 1
+            fi
+            echo -e "${YELLOW}[Note] Key generated without a passphrase.${NC}"
             echo -e "${GREEN}[Success] New key pair generated successfully!${NC}"
         else
             echo -e "${RED}[Cancelled] Generation cancelled. Exiting safely.${NC}"
@@ -75,6 +84,7 @@ do_get_key() {
 
     # Print Private Key
     echo -e "${CYAN}==================== [ Private Key ] ====================${NC}"
+    echo -e "${RED}[Security] Ensure terminal logging is disabled before proceeding.${NC}"
     echo -e "${YELLOW}Purpose: Paste into your VPS initialization script${NC}"
     cat "${KEY_FILE}"
     echo -e "${CYAN}=========================================================${NC}\n"
@@ -110,8 +120,7 @@ do_set_key() {
 
     # Prepare SSH directory
     echo -e "${BLUE}[Step 1/4] Preparing SSH directory...${NC}"
-    mkdir -p ~/.ssh
-    chmod 700 ~/.ssh
+    ensure_ssh_dir
 
     # Receive the Private Key
     echo -e "\n${YELLOW}=======================================================${NC}"
@@ -121,6 +130,8 @@ do_set_key() {
 
     local TMP_KEY
     TMP_KEY=$(mktemp)
+    # shellcheck disable=SC2064
+    trap "rm -f '$TMP_KEY'" EXIT INT TERM
     chmod 600 "$TMP_KEY"
     cat /dev/tty > "$TMP_KEY"
 
@@ -132,8 +143,14 @@ do_set_key() {
 
     # Detect key type and determine target filename
     local KEY_FILE="$HOME/.ssh/id_ed25519"
-    if grep -q "BEGIN RSA PRIVATE KEY" "$TMP_KEY" 2>/dev/null; then
+    if grep -q "BEGIN RSA PRIVATE KEY" "$TMP_KEY"; then
+        # PEM-format RSA key
         KEY_FILE="$HOME/.ssh/id_rsa"
+    elif grep -q "BEGIN OPENSSH PRIVATE KEY" "$TMP_KEY"; then
+        # Modern OpenSSH format — check actual key type from public key output
+        local KEY_TYPE
+        KEY_TYPE=$(ssh-keygen -y -f "$TMP_KEY" 2>/dev/null | awk '{print $1}' || true)
+        [ "$KEY_TYPE" = "ssh-rsa" ] && KEY_FILE="$HOME/.ssh/id_rsa"
     fi
 
     # Warn if key already exists
@@ -150,6 +167,7 @@ do_set_key() {
     # Move to final location with strict permissions
     echo -e "\n${BLUE}[Step 2/4] Applying strict permissions (600)...${NC}"
     mv "$TMP_KEY" "$KEY_FILE"
+    trap - EXIT INT TERM
     chmod 600 "$KEY_FILE"
 
     # Generate matching public key from private key
@@ -163,8 +181,10 @@ do_set_key() {
 
     # Add GitHub to known_hosts
     echo -e "${BLUE}[Step 4/4] Adding GitHub to trusted hosts...${NC}"
-    if ! grep -q "^github.com " ~/.ssh/known_hosts 2>/dev/null; then
-        ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+    if ! ssh-keygen -F github.com -f ~/.ssh/known_hosts > /dev/null 2>&1; then
+        if ! ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null; then
+            echo -e "  ${YELLOW}[Warning] Could not fetch GitHub host key. Verification may fail.${NC}"
+        fi
     fi
 
     # Verify Connection
@@ -173,7 +193,7 @@ do_set_key() {
     local SSH_OUTPUT
     SSH_OUTPUT=$(ssh -T git@github.com 2>&1 || true)
 
-    if echo "$SSH_OUTPUT" | grep -q "successfully authenticated"; then
+    if [[ "$SSH_OUTPUT" == *"successfully authenticated"* ]]; then
         echo -e "${GREEN}[Success] GitHub authentication is configured perfectly!${NC}"
         echo -e "${GREEN}You can now securely 'git clone' your private repositories.${NC}"
     else
