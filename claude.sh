@@ -121,6 +121,7 @@ clean_settings_json() {
     fi
 
     # 删除包含目标 key 的行（单次 sed 调用，锚定匹配避免误删）
+    # 注：此处不用 sed_inplace，因需传递数组形式的多个 -e 参数，该工具函数不支持
     local _sed_args=()
     for var in "${CLEAN_VARS[@]}"; do
         _sed_args+=(-e "/^[[:space:]]*\"${var}\"[[:space:]]*:/d")
@@ -269,8 +270,12 @@ repair_settings_json() {
 
     # 比较修复前后是否有变化
     if ! cmp -s "$file" "$tmp"; then
-        mv "$tmp" "$file"
-        echo -e "  ${GREEN}✓${NC} Repaired ~/.claude/settings.json (fixed formatting)"
+        if mv "$tmp" "$file"; then
+            echo -e "  ${GREEN}✓${NC} Repaired ~/.claude/settings.json (fixed formatting)"
+        else
+            rm -f "$tmp"
+            echo -e "  ${YELLOW}[Warning] Failed to write repaired settings.json${NC}"
+        fi
     fi
 }
 
@@ -303,20 +308,55 @@ detect_install_method() {
     INSTALL_METHOD=""
     CLAUDE_PATH=""
 
-    if command -v npm &> /dev/null && npm list -g --depth=0 @anthropic-ai/claude-code 2>/dev/null | grep -q "claude-code"; then
-        INSTALL_METHOD="npm"
-        echo -e "Detected: ${CYAN}NPM global install${NC}"
-    elif [ "$OS_TYPE" = "macos" ] && command -v brew &> /dev/null && brew list --cask claude-code &>/dev/null; then
+    if [ "$OS_TYPE" = "macos" ] && command -v brew &>/dev/null && brew list --cask claude-code &>/dev/null; then
         INSTALL_METHOD="homebrew"
         echo -e "Detected: ${CYAN}Homebrew Cask${NC}"
-    elif command -v claude &> /dev/null; then
-        INSTALL_METHOD="other"
+    elif command -v claude &>/dev/null; then
         CLAUDE_PATH=$(command -v claude)
-        echo -e "Detected: ${CYAN}Official installer / manual${NC}"
-        echo -e "Binary path: ${YELLOW}${CLAUDE_PATH}${NC}"
+        # 官方安装脚本下载预编译二进制，安装到 ~/.local/bin/，不经过 npm
+        # 用 npm 全局前缀比对路径，确保只有真正通过 npm install -g 的二进制才被识别为 npm
+        local _npm_prefix=""
+        if command -v npm &>/dev/null; then
+            _npm_prefix=$(npm prefix -g 2>/dev/null || true)
+        fi
+        if [ -n "$_npm_prefix" ] && [[ "$CLAUDE_PATH" == "${_npm_prefix}/bin/"* ]]; then
+            INSTALL_METHOD="npm"
+            echo -e "Detected: ${CYAN}NPM global install${NC}"
+        else
+            INSTALL_METHOD="other"
+            echo -e "Detected: ${CYAN}Official installer / manual${NC}"
+            echo -e "Binary path: ${YELLOW}${CLAUDE_PATH}${NC}"
+        fi
     else
         echo -e "${YELLOW}[Notice] Claude Code installation not detected.${NC}"
     fi
+}
+
+# ensure_local_bin_in_path: 若 ~/.local/bin 未在 shell 配置中，自动添加 PATH 导出
+ensure_local_bin_in_path() {
+    local local_bin="$HOME/.local/bin"
+    # 已在配置文件中则跳过（避免重复写入）
+    if grep -qF '.local/bin' "$SHELL_RC" 2>/dev/null; then
+        return 0
+    fi
+    # 写入 shell 配置文件
+    printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$SHELL_RC"
+    echo -e "${GREEN}[Success] Added ~/.local/bin to PATH in ${SHELL_RC}${NC}"
+    # 同步更新当前会话 PATH，使 claude --version 立即可用
+    export PATH="$local_bin:$PATH"
+    _PATH_WRITTEN=true
+}
+
+# print_source_reminder: 打印醒目的 source 提示框
+print_source_reminder() {
+    local rc_display="${SHELL_RC/#$HOME/~}"
+    echo -e "\n${YELLOW}════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}  Apply changes in your current terminal:${NC}"
+    echo
+    echo -e "    ${CYAN}source ${rc_display}${NC}"
+    echo
+    echo -e "${YELLOW}  Or simply reopen your terminal window.${NC}"
+    echo -e "${YELLOW}════════════════════════════════════════${NC}"
 }
 
 # =============================================================================
@@ -324,6 +364,7 @@ detect_install_method() {
 # =============================================================================
 
 do_install() {
+    _PATH_WRITTEN=false
     echo -e "\n${BLUE}=== Install / Update Claude Code ===${NC}"
     echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}"
 
@@ -345,15 +386,16 @@ do_install() {
         if ! run_official_installer; then
             return 1
         fi
+        ensure_local_bin_in_path
     else
         case "$INSTALL_METHOD" in
             npm)
                 echo -e "Updating via NPM..."
-                if npm update -g @anthropic-ai/claude-code; then
+                if npm install -g @anthropic-ai/claude-code@latest; then
                     echo -e "${GREEN}[Success] NPM update complete.${NC}"
                 else
                     echo -e "${YELLOW}[Warning] NPM update failed, trying sudo...${NC}"
-                    if sudo npm update -g @anthropic-ai/claude-code; then
+                    if sudo npm install -g @anthropic-ai/claude-code@latest; then
                         echo -e "${GREEN}[Success] NPM update complete (sudo).${NC}"
                     else
                         echo -e "${RED}[Error] NPM update failed.${NC}"
@@ -375,6 +417,7 @@ do_install() {
                 if ! run_official_installer; then
                     return 1
                 fi
+                ensure_local_bin_in_path
                 ;;
         esac
     fi
@@ -384,6 +427,9 @@ do_install() {
     claude --version 2>/dev/null || echo -e "${YELLOW}[Warning] Could not retrieve version.${NC}"
 
     echo -e "\n${GREEN}[Success] Claude Code is ready!${NC}"
+    if [ "$_PATH_WRITTEN" = true ]; then
+        print_source_reminder
+    fi
 }
 
 # =============================================================================
@@ -461,9 +507,7 @@ EOF
     echo -e "${CYAN}========================================${NC}"
 
     echo -e "\n${GREEN}[Success] Claude Code API configured!${NC}"
-    echo -e "${YELLOW}[Reminder] To apply the changes:${NC}"
-    echo -e "  1. Reopen your terminal"
-    echo -e "  2. Or run: ${CYAN}source ${SHELL_RC_DISPLAY}${NC}"
+    print_source_reminder
 }
 
 # =============================================================================
