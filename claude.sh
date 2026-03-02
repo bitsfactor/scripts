@@ -511,7 +511,72 @@ EOF
 }
 
 # =============================================================================
-# 3) Uninstall Claude Code — detect install method, remove binary and configs
+# 3) Trust All Tools — write skipDangerousModePermissionPrompt to settings.json
+# =============================================================================
+
+do_trust_all() {
+    echo -e "\n${BLUE}=== Trust All Tools ===${NC}"
+
+    if [ "$(id -u)" = "0" ]; then
+        echo -e "\n${YELLOW}[Notice] Running as root — --dangerously-skip-permissions is blocked by Claude Code.${NC}"
+        echo -e "${YELLOW}Writing skipDangerousModePermissionPrompt to settings.json instead.${NC}"
+    fi
+
+    # ---- Check python3 ----
+    if ! command -v python3 &>/dev/null; then
+        echo -e "${RED}[Error] python3 is required but not found. Install it and retry.${NC}"
+        return 1
+    fi
+
+    # ---- Ensure ~/.claude/settings.json ----
+    echo -e "\n${BLUE}[Step 1/2] Checking settings.json...${NC}"
+    mkdir -p "$HOME/.claude"
+    local file="$HOME/.claude/settings.json"
+    if [ ! -f "$file" ]; then
+        echo '{}' > "$file"
+        echo -e "  ${GREEN}✓${NC} Created ~/.claude/settings.json"
+    else
+        repair_settings_json
+    fi
+
+    # ---- Write the key ----
+    echo -e "\n${BLUE}[Step 2/2] Writing skipDangerousModePermissionPrompt...${NC}"
+
+    local tmp_py
+    tmp_py=$(mktemp)
+    trap "rm -f '$tmp_py'" RETURN
+
+    cat > "$tmp_py" << 'PYEOF'
+import json, sys
+file = sys.argv[1]
+with open(file) as f:
+    data = json.load(f)
+already = data.get("skipDangerousModePermissionPrompt") is True
+data["skipDangerousModePermissionPrompt"] = True
+with open(file, "w") as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+print("already" if already else "written")
+PYEOF
+
+    local result
+    result=$(python3 "$tmp_py" "$file") || {
+        echo -e "${RED}[Error] Failed to update settings.json.${NC}"
+        return 1
+    }
+
+    if [ "$result" = "already" ]; then
+        echo -e "  ${CYAN}Already set — no changes needed.${NC}"
+    else
+        echo -e "  ${GREEN}✓${NC} skipDangerousModePermissionPrompt = true"
+    fi
+
+    echo -e "\n${GREEN}[Success] Permission prompts will no longer appear.${NC}"
+    echo -e "${CYAN}Restart Claude Code to apply.${NC}"
+}
+
+# =============================================================================
+# 4) Uninstall Claude Code — detect install method, remove binary and configs
 # =============================================================================
 
 do_uninstall() {
@@ -771,16 +836,18 @@ echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}\n"
 echo -e "${CYAN}Select an option:${NC}"
 echo -e "  ${GREEN}1)${NC} Install / Update Claude Code"
 echo -e "  ${GREEN}2)${NC} Set API"
-echo -e "  ${RED}3)${NC} Uninstall Claude Code"
+echo -e "  ${GREEN}3)${NC} Trust All Tools"
+echo -e "  ${RED}4)${NC} Uninstall Claude Code"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
 stty sane < /dev/tty 2>/dev/null || true
-tty_read MENU_CHOICE "Enter option (0/1/2/3): "
+tty_read MENU_CHOICE "Enter option (0/1/2/3/4): "
 
 case "$MENU_CHOICE" in
     1) do_install ;;
     2) do_set_api ;;
-    3) do_uninstall ;;
+    3) do_trust_all ;;
+    4) do_uninstall ;;
     0|"")
         echo -e "${YELLOW}Exited.${NC}"
         exit 0
