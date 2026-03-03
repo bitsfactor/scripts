@@ -9,6 +9,8 @@ BitsFactor Scripts 是一组 bash 引导脚本，用于本地机器和远程 VPS
 ## 仓库结构
 
 ```
+one.sh        # 一键式 VPS 初始化编排脚本（依次调用 env/git/claude，四步完成）
+env.sh        # 开发环境配置工具（Brew / Git / Python3 / Node.js / Go）
 git.sh        # Git SSH 密钥管理工具（获取密钥 / 配置密钥，二合一菜单）
 claude.sh     # Claude Code 设置工具（安装 / 配置 API / 卸载，三合一菜单）
 ```
@@ -19,10 +21,14 @@ claude.sh     # Claude Code 设置工具（安装 / 配置 API / 卸载，三合
 
 ```bash
 # 本地执行
+bash one.sh
+bash env.sh
 bash git.sh
 bash claude.sh
 
 # 远程执行（主要使用方式）
+curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/one.sh | bash
+curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/env.sh | bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
 ```

@@ -2,6 +2,19 @@
 
 A collection of bootstrap scripts for developers. All scripts support **macOS** and **Linux**, and run independently via `curl | bash`.
 
+## one.sh — One-Click VPS Setup
+
+One command to fully initialize a new VPS. Downloads and orchestrates `env.sh`, `git.sh`, and `claude.sh` in sequence — each step asks for confirmation before running, so you can skip anything you don't need.
+
+- **Step 1/4** Install dev tools (env.sh install-all)
+- **Step 2/4** Set SSH private key (git.sh set-key)
+- **Step 3/4** Install Claude Code (claude.sh install)
+- **Step 4/4** Configure API (claude.sh set-api)
+
+```bash
+curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/one.sh | bash
+```
+
 ## env.sh — Development Environment Setup
 
 One-command setup for a complete development environment on any fresh macOS or Linux machine. Installs Homebrew, Git, Python3, Node.js, and Go — each as an independent option or all at once.
@@ -17,14 +30,6 @@ One-command setup for a complete development environment on any fresh macOS or L
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/env.sh | bash
 ```
 
-```bash
-curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/env.sh | bash
-```
-
-```bash
-curl -s https://ghproxy.net/https://raw.githubusercontent.com/bitsfactor/scripts/main/env.sh | bash
-```
-
 ## git.sh — SSH Key Manager
 
 The fastest way to set up GitHub SSH access across all your machines. Designed for solo developers who manage multiple VPS instances — generate a key pair once on your main computer, then share the same private key to every new server. No more repeated key generation or manual config.
@@ -34,14 +39,6 @@ The fastest way to set up GitHub SSH access across all your machines. Designed f
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
-```
-
-```bash
-curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
-```
-
-```bash
-curl -s https://ghproxy.net/https://raw.githubusercontent.com/bitsfactor/scripts/main/git.sh | bash
 ```
 
 ## claude.sh — Claude Code Setup
@@ -56,14 +53,6 @@ Install / update, configure, or uninstall Claude Code.
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
 ```
 
-```bash
-curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
-```
-
-```bash
-curl -s https://ghproxy.net/https://raw.githubusercontent.com/bitsfactor/scripts/main/claude.sh | bash
-```
-
 ## pytools.sh — Python Tools Installer
 
 One-click deploy Python command-line tools to `~/pytools`. Downloads each tool from CDN, installs Python dependencies, and adds `~/pytools` to `PATH` — so every tool is callable by name from anywhere in the terminal.
@@ -73,12 +62,4 @@ One-click deploy Python command-line tools to `~/pytools`. Downloads each tool f
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/pytools.sh | bash
-```
-
-```bash
-curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/pytools.sh | bash
-```
-
-```bash
-curl -s https://ghproxy.net/https://raw.githubusercontent.com/bitsfactor/scripts/main/pytools.sh | bash
 ```
