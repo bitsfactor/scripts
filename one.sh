@@ -37,7 +37,8 @@ CDN_BASE="https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main"
 # =============================================================================
 
 TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
+trap 'rm -rf "$TMP_DIR"' EXIT
+trap 'exit 130' INT TERM
 
 SCRIPTS=("env.sh" "git.sh" "claude.sh")
 
@@ -115,6 +116,7 @@ run_step() {
             ABORTED=true
         fi
     fi
+    stty sane < /dev/tty 2>/dev/null || true
 }
 
 # =============================================================================

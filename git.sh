@@ -125,19 +125,28 @@ do_set_key() {
     # Receive the Private Key
     echo -e "\n${YELLOW}=======================================================${NC}"
     echo -e "${YELLOW}Please paste your SSH Private Key below.${NC}"
-    echo -e "${YELLOW}Press [Enter] for a new line, then press [Ctrl+D] to save.${NC}"
+    echo -e "${YELLOW}(Auto-detects end of key, then press Enter to confirm.)${NC}"
     echo -e "${YELLOW}=======================================================${NC}\n"
 
     local TMP_KEY
     TMP_KEY=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$TMP_KEY'" EXIT INT TERM
+    trap "rm -f '$TMP_KEY'" EXIT
+    trap 'exit 130' INT TERM
     chmod 600 "$TMP_KEY"
-    cat /dev/tty > "$TMP_KEY"
+    local line
+    while IFS= read -r line || [ -n "$line" ]; do
+        printf '%s\n' "$line"
+        [[ "$line" == "-----END"*"-----" ]] && break
+    done < /dev/tty > "$TMP_KEY"
+
+    echo -e "\n${GREEN}Key received.${NC}"
+    tty_read _confirm "Press Enter to continue (Ctrl+C to cancel): "
 
     if [ ! -s "$TMP_KEY" ]; then
         echo -e "${RED}[Error] No key data received.${NC}"
         rm -f "$TMP_KEY"
+        trap - EXIT INT TERM
         return 1
     fi
 
@@ -160,6 +169,7 @@ do_set_key() {
         if [[ ! "$overwrite_confirm" =~ ^[Yy]$ ]]; then
             echo -e "${RED}[Cancelled] Operation cancelled.${NC}"
             rm -f "$TMP_KEY"
+            trap - EXIT INT TERM
             return
         fi
     fi
