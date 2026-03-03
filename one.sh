@@ -12,7 +12,7 @@
 
 set -e
 
-VERSION="1.0.1"
+VERSION="1.0.2"
 
 # Color definitions
 GREEN='\033[32m'
@@ -124,6 +124,8 @@ run_step() {
 # =============================================================================
 
 STEP_NAMES=("Install dev tools" "Set SSH private key" "Install Claude Code" "Configure API")
+
+set +e  # run_step handles errors explicitly; disable errexit to prevent silent exits
 
 run_step 1 4 "env.sh"    "install-all" "${STEP_NAMES[0]}"
 run_step 2 4 "git.sh"    "set-key"     "${STEP_NAMES[1]}"
