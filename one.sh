@@ -12,7 +12,7 @@
 
 set -e
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 
 # Color definitions
 GREEN='\033[32m'
