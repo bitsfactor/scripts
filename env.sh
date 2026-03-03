@@ -531,6 +531,24 @@ do_install_oosp() {
 }
 
 # =============================================================================
+# CLI parameter handling — direct subcommand execution
+# =============================================================================
+
+if [ $# -gt 0 ]; then
+    case "$1" in
+        install-all)    do_install_all ;;
+        install-brew)   do_install_brew ;;
+        install-git)    do_install_git ;;
+        install-python) do_install_python ;;
+        install-node)   do_install_node ;;
+        install-go)     do_install_go ;;
+        install-oosp)   do_install_oosp ;;
+        *) echo -e "${RED}[Error] Unknown command: $1${NC}"; exit 1 ;;
+    esac
+    exit 0
+fi
+
+# =============================================================================
 # Entry menu
 # =============================================================================
 

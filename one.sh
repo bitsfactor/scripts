@@ -1,0 +1,159 @@
+#!/bin/bash
+
+# =============================================================================
+# BitsFactor One-Click VPS Initializer
+# Orchestrates env.sh, git.sh, claude.sh to set up a new VPS in one command.
+# Supports macOS and Linux (Debian / Ubuntu).
+#
+# Usage:
+#   bash one.sh
+#   curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/one.sh | bash
+# =============================================================================
+
+set -e
+
+VERSION="1.0.0"
+
+# Color definitions
+GREEN='\033[32m'
+RED='\033[31m'
+YELLOW='\033[33m'
+BLUE='\033[34m'
+CYAN='\033[36m'
+NC='\033[0m'
+
+# tty_read: read one line from /dev/tty
+# Args: $1 = variable name to store result
+#       $2 = (optional) prompt string (written directly to /dev/tty)
+tty_read() {
+    [ -n "$2" ] && printf '%s' "$2" > /dev/tty
+    IFS= read -r "$1" < /dev/tty || true
+}
+
+CDN_BASE="https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main"
+
+# =============================================================================
+# Download phase — fetch scripts to temp directory
+# =============================================================================
+
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
+
+SCRIPTS=("env.sh" "git.sh" "claude.sh")
+
+echo -e "${BLUE}Downloading scripts...${NC}"
+for script in "${SCRIPTS[@]}"; do
+    if ! curl -fsSL "${CDN_BASE}/${script}" -o "${TMP_DIR}/${script}"; then
+        echo -e "${RED}[Error] Failed to download ${script}${NC}"
+        exit 1
+    fi
+    echo -e "  ${GREEN}✓${NC} ${script}"
+done
+
+# =============================================================================
+# Welcome
+# =============================================================================
+
+stty sane < /dev/tty 2>/dev/null || true
+
+echo ""
+echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
+echo -e "${BLUE}  BitsFactor One-Click VPS Setup v${VERSION}${NC}"
+echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
+echo ""
+echo -e "${CYAN}This will run the following steps:${NC}"
+echo -e "  ${GREEN}Step 1/4${NC}  Install dev tools      (env.sh install-all)"
+echo -e "  ${GREEN}Step 2/4${NC}  Set SSH private key     (git.sh set-key)"
+echo -e "  ${GREEN}Step 3/4${NC}  Install Claude Code     (claude.sh install)"
+echo -e "  ${GREEN}Step 4/4${NC}  Configure API           (claude.sh set-api)"
+echo ""
+echo -e "${YELLOW}Each step will ask for confirmation before running.${NC}"
+echo ""
+
+# =============================================================================
+# run_step — execute one step with confirmation
+# =============================================================================
+
+# Result tracking: 0=success, 1=failed, 2=skipped
+RESULTS=()
+ABORTED=false
+
+run_step() {
+    if [ "$ABORTED" = true ]; then
+        RESULTS+=("2")
+        return 0
+    fi
+
+    local step_num="$1"
+    local total="$2"
+    local script_file="$3"
+    local subcommand="$4"
+    local description="$5"
+
+    echo -e "\n${BLUE}──────────────────────────────────────────────${NC}"
+    echo -e "${BLUE}  [Step ${step_num}/${total}] ${description}${NC}"
+    echo -e "${BLUE}──────────────────────────────────────────────${NC}"
+    echo -e "  ${CYAN}→ ${script_file} ${subcommand}${NC}"
+    echo ""
+
+    tty_read confirm "  Run this step? [Y/n]: "
+    if [[ "$confirm" =~ ^[Nn]$ ]]; then
+        echo -e "  ${YELLOW}[Skipped]${NC}"
+        RESULTS+=("2")
+        return 0
+    fi
+
+    echo ""
+    if bash "${TMP_DIR}/${script_file}" "$subcommand"; then
+        RESULTS+=("0")
+    else
+        RESULTS+=("1")
+        echo -e "\n  ${RED}[Failed] ${description}${NC}"
+        tty_read cont "  Continue to next step? [Y/n]: "
+        if [[ "$cont" =~ ^[Nn]$ ]]; then
+            echo -e "${RED}[Aborted] Setup stopped by user.${NC}"
+            ABORTED=true
+        fi
+    fi
+}
+
+# =============================================================================
+# Execute steps
+# =============================================================================
+
+STEP_NAMES=("Install dev tools" "Set SSH private key" "Install Claude Code" "Configure API")
+
+run_step 1 4 "env.sh"    "install-all" "${STEP_NAMES[0]}"
+run_step 2 4 "git.sh"    "set-key"     "${STEP_NAMES[1]}"
+run_step 3 4 "claude.sh" "install"     "${STEP_NAMES[2]}"
+run_step 4 4 "claude.sh" "set-api"     "${STEP_NAMES[3]}"
+
+# =============================================================================
+# Summary
+# =============================================================================
+
+echo -e "\n${BLUE}═══════════════════════════════════════════════${NC}"
+echo -e "${BLUE}  Setup Complete${NC}"
+echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
+
+for i in "${!STEP_NAMES[@]}"; do
+    step_result="${RESULTS[$i]:-2}"
+    case "$step_result" in
+        0) echo -e "  ${GREEN}✓${NC}  ${STEP_NAMES[$i]}" ;;
+        1) echo -e "  ${RED}✗${NC}  ${STEP_NAMES[$i]}" ;;
+        2) echo -e "  ${YELLOW}–${NC}  ${STEP_NAMES[$i]}  ${YELLOW}(skipped)${NC}" ;;
+    esac
+done
+
+echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
+
+# Detect shell RC for reminder
+USER_SHELL="$(basename "${SHELL:-/bin/bash}")"
+case "$USER_SHELL" in
+    zsh)  SHELL_RC="$HOME/.zshrc" ;;
+    *)    SHELL_RC="$HOME/.bashrc" ;;
+esac
+
+echo -e "\n${YELLOW}[Reminder] To apply all PATH/env changes:${NC}"
+echo -e "  ${CYAN}source ${SHELL_RC/#$HOME/~}${NC}"
+echo -e "  ${YELLOW}Or simply reopen your terminal.${NC}"

@@ -827,6 +827,21 @@ do_uninstall() {
 }
 
 # =============================================================================
+# CLI parameter handling — direct subcommand execution
+# =============================================================================
+
+if [ $# -gt 0 ]; then
+    case "$1" in
+        install)   do_install ;;
+        set-api)   do_set_api ;;
+        trust-all) do_trust_all ;;
+        uninstall) do_uninstall ;;
+        *) echo -e "${RED}[Error] Unknown command: $1${NC}"; exit 1 ;;
+    esac
+    exit 0
+fi
+
+# =============================================================================
 # Entry menu
 # =============================================================================
 
