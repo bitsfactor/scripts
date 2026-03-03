@@ -12,7 +12,7 @@
 
 set -e
 
-VERSION="1.0.1"
+VERSION="1.1.1"
 
 # Color definitions
 GREEN='\033[32m'
@@ -201,7 +201,7 @@ do_set_key() {
     echo -e "${BLUE}Verifying GitHub connection...${NC}"
 
     local SSH_OUTPUT
-    SSH_OUTPUT=$(ssh -T git@github.com 2>&1 || true)
+    SSH_OUTPUT=$(ssh -T git@github.com < /dev/null 2>&1 || true)
 
     if [[ "$SSH_OUTPUT" == *"successfully authenticated"* ]]; then
         echo -e "${GREEN}[Success] GitHub authentication is configured perfectly!${NC}"

@@ -12,7 +12,7 @@
 
 set -e
 
-VERSION="1.0.2"
+VERSION="1.1.1"
 
 # Color definitions
 GREEN='\033[32m'
@@ -31,6 +31,12 @@ tty_read() {
 }
 
 CDN_BASE="https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main"
+
+# OS detection
+case "$(uname -s | tr '[:upper:]' '[:lower:]')" in
+    linux*)  IS_LINUX=true ;;
+    *)       IS_LINUX=false ;;
+esac
 
 # =============================================================================
 # Download phase — fetch scripts to temp directory
@@ -62,11 +68,16 @@ echo -e "${BLUE}═════════════════════�
 echo -e "${BLUE}  BitsFactor One-Click VPS Setup v${VERSION}${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
 echo ""
+STEP_NAMES=("Install dev tools" "Set SSH private key" "Install Claude Code" "Configure API")
+if [ "$IS_LINUX" = true ]; then
+    STEP_NAMES+=("Trust All Tools")
+fi
+TOTAL=${#STEP_NAMES[@]}
+
 echo -e "${CYAN}This will run the following steps:${NC}"
-echo -e "  ${GREEN}Step 1/4${NC}  Install dev tools      (env.sh install-all)"
-echo -e "  ${GREEN}Step 2/4${NC}  Set SSH private key     (git.sh set-key)"
-echo -e "  ${GREEN}Step 3/4${NC}  Install Claude Code     (claude.sh install)"
-echo -e "  ${GREEN}Step 4/4${NC}  Configure API           (claude.sh set-api)"
+for i in "${!STEP_NAMES[@]}"; do
+    echo -e "  ${GREEN}Step $((i+1))/${TOTAL}${NC}  ${STEP_NAMES[$i]}"
+done
 echo ""
 echo -e "${YELLOW}Each step will ask for confirmation before running.${NC}"
 echo ""
@@ -97,21 +108,27 @@ run_step() {
     echo -e "  ${CYAN}→ ${script_file} ${subcommand}${NC}"
     echo ""
 
+    local interrupted=false
+    trap 'interrupted=true' INT
     tty_read confirm "  Run this step? [Y/n]: "
-    if [[ "$confirm" =~ ^[Nn]$ ]]; then
+    trap 'true' INT
+    if [ "$interrupted" = true ] || [[ "$confirm" =~ ^[Nn]$ ]]; then
         echo -e "  ${YELLOW}[Skipped]${NC}"
         RESULTS+=("2")
         return 0
     fi
 
     echo ""
-    if bash "${TMP_DIR}/${script_file}" "$subcommand"; then
+    if bash "${TMP_DIR}/${script_file}" "$subcommand" < /dev/null; then
         RESULTS+=("0")
     else
         RESULTS+=("1")
         echo -e "\n  ${RED}[Failed] ${description}${NC}"
+        interrupted=false
+        trap 'interrupted=true' INT
         tty_read cont "  Continue to next step? [Y/n]: "
-        if [[ "$cont" =~ ^[Nn]$ ]]; then
+        trap 'true' INT
+        if [ "$interrupted" = true ] || [[ "$cont" =~ ^[Nn]$ ]]; then
             echo -e "${RED}[Aborted] Setup stopped by user.${NC}"
             ABORTED=true
         fi
@@ -123,14 +140,18 @@ run_step() {
 # Execute steps
 # =============================================================================
 
-STEP_NAMES=("Install dev tools" "Set SSH private key" "Install Claude Code" "Configure API")
-
 set +e  # run_step handles errors explicitly; disable errexit to prevent silent exits
+trap 'true' INT TERM  # during steps: absorb signals so Ctrl+C only kills the child process
 
-run_step 1 4 "env.sh"    "install-all" "${STEP_NAMES[0]}"
-run_step 2 4 "git.sh"    "set-key"     "${STEP_NAMES[1]}"
-run_step 3 4 "claude.sh" "install"     "${STEP_NAMES[2]}"
-run_step 4 4 "claude.sh" "set-api"     "${STEP_NAMES[3]}"
+run_step 1 $TOTAL "env.sh"    "install-all" "${STEP_NAMES[0]}"
+run_step 2 $TOTAL "git.sh"    "set-key"     "${STEP_NAMES[1]}"
+run_step 3 $TOTAL "claude.sh" "install"     "${STEP_NAMES[2]}"
+run_step 4 $TOTAL "claude.sh" "set-api"     "${STEP_NAMES[3]}"
+if [ "$IS_LINUX" = true ]; then
+    run_step 5 $TOTAL "claude.sh" "trust-all" "${STEP_NAMES[4]}"
+fi
+
+trap - INT TERM  # restore default signal handling after steps
 
 # =============================================================================
 # Summary
