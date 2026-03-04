@@ -30,11 +30,11 @@ bash claude.sh
 bash pytools.sh
 
 # 远程执行（主要使用方式）
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/one.sh | bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/env.sh | bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/pytools.sh | bash
+curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/one.sh | bash
+curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/env.sh | bash
+curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
+curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
+curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/pytools.sh | bash
 ```
 
 ## 脚本规范

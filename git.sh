@@ -7,13 +7,13 @@
 #
 # Usage:
 #   bash git.sh
-#   curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
+#   curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
 # =============================================================================
 
 set -e
 
 # CDN base URL (can be overridden externally)
-: "${CDN_BASE:=https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main}"
+: "${CDN_BASE:=https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main}"
 
 # Load unified version
 _SCRIPT_DIR=""

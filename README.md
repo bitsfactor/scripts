@@ -6,7 +6,7 @@ A collection of bootstrap scripts for developers. All scripts support **macOS** 
 
 **jsDelivr CDN** (faster, may have cache delay):
 ```bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/<script> | bash
+curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/<script> | bash
 ```
 
 **GitHub Raw** (always latest):
