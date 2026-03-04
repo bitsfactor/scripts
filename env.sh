@@ -12,7 +12,15 @@
 
 set -e
 
-VERSION="1.0.0"
+# Load unified version
+_SCRIPT_DIR=""
+[ -n "${BASH_SOURCE[0]}" ] && _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd 2>/dev/null)"
+if [ -n "$_SCRIPT_DIR" ] && [ -f "$_SCRIPT_DIR/version.sh" ]; then
+    . "$_SCRIPT_DIR/version.sh"
+else
+    eval "$(curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/version.sh 2>/dev/null)" 2>/dev/null || true
+fi
+: "${VERSION:=0.0.0}"
 
 # Color definitions
 GREEN='\033[32m'
@@ -284,6 +292,12 @@ do_install_node() {
 
 do_install_go() {
     echo -e "\n${BLUE}=== Install Go ===${NC}"
+
+    # Activate existing Go SDK in current session (PATH block may not be sourced yet)
+    if [ -x "$HOME/.go_sdk/bin/go" ]; then
+        export GOROOT="$HOME/.go_sdk"
+        export PATH="$GOROOT/bin:$PATH"
+    fi
 
     if command -v go &> /dev/null; then
         echo -e "${GREEN}[Skip] Go is already installed: $(go version)${NC}"

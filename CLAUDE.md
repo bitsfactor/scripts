@@ -9,6 +9,7 @@ BitsFactor Scripts 是一组 bash 引导脚本，用于本地机器和远程 VPS
 ## 仓库结构
 
 ```
+version.sh    # 统一版本号来源（所有脚本运行时自动加载）
 one.sh        # 一键式 VPS 初始化编排脚本（依次调用 env/git/claude，四步完成）
 env.sh        # 开发环境配置工具（Brew / Git / Python3 / Node.js / Go）
 git.sh        # Git SSH 密钥管理工具（获取密钥 / 配置密钥，二合一菜单）

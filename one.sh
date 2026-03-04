@@ -12,7 +12,15 @@
 
 set -e
 
-VERSION="1.1.1"
+# Load unified version
+_SCRIPT_DIR=""
+[ -n "${BASH_SOURCE[0]}" ] && _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd 2>/dev/null)"
+if [ -n "$_SCRIPT_DIR" ] && [ -f "$_SCRIPT_DIR/version.sh" ]; then
+    . "$_SCRIPT_DIR/version.sh"
+else
+    eval "$(curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/version.sh 2>/dev/null)" 2>/dev/null || true
+fi
+: "${VERSION:=0.0.0}"
 
 # Color definitions
 GREEN='\033[32m'
@@ -46,7 +54,7 @@ TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 trap 'exit 130' INT TERM
 
-SCRIPTS=("env.sh" "git.sh" "claude.sh")
+SCRIPTS=("version.sh" "env.sh" "git.sh" "claude.sh")
 
 echo -e "${BLUE}Downloading scripts...${NC}"
 for script in "${SCRIPTS[@]}"; do

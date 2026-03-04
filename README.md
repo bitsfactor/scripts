@@ -1,15 +1,16 @@
 # BitsFactor Scripts
 
-A collection of bootstrap scripts for developers. All scripts support **macOS** and **Linux**, and run independently via `curl | bash`.
+A collection of bootstrap scripts for developers. All scripts support **macOS** and **Linux**, and run independently via `curl | bash`. All scripts share a single version number defined in `version.sh`.
 
 ## one.sh — One-Click VPS Setup
 
 One command to fully initialize a new VPS. Downloads and orchestrates `env.sh`, `git.sh`, and `claude.sh` in sequence — each step asks for confirmation before running, so you can skip anything you don't need.
 
-- **Step 1/4** Install dev tools (env.sh install-all)
-- **Step 2/4** Set SSH private key (git.sh set-key)
-- **Step 3/4** Install Claude Code (claude.sh install)
-- **Step 4/4** Configure API (claude.sh set-api)
+- **Step 1** Install dev tools (env.sh install-all)
+- **Step 2** Set SSH private key (git.sh set-key)
+- **Step 3** Install Claude Code (claude.sh install)
+- **Step 4** Configure API (claude.sh set-api)
+- **Step 5** Trust All Tools (claude.sh trust-all) — Linux only
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/one.sh | bash
@@ -25,6 +26,7 @@ One-command setup for a complete development environment on any fresh macOS or L
 - **4) Install Python3** — Installs Python3 + pip + venv via Homebrew (macOS) or `apt-get` (Linux).
 - **5) Install Node.js & npm** — Installs Node via Homebrew (macOS) or nvm LTS (Linux). Writes nvm init block to shell config.
 - **6) Install Go** — Installs Go via Homebrew (macOS) or downloads the official SDK to `~/.go_sdk` (Linux, no sudo required). Writes `GOROOT`/`PATH` to shell config.
+- **7) Install / Update OOSP** — Fetch OOSP spec from CDN and append to `~/.claude/CLAUDE.md` or project-level `CLAUDE.md`. Supports Chinese and English.
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/env.sh | bash
@@ -47,7 +49,8 @@ Install / update, configure, or uninstall Claude Code.
 
 - **1) Install / Update** — Install Claude Code, or update it if already installed. Automatically detects the install method (npm, Homebrew, official installer) and runs the matching upgrade command.
 - **2) Set API** — Enter your API endpoint and key. The script saves them and cleans up any old config automatically.
-- **3) Uninstall** — Remove Claude Code and all its config files. You can also choose to only clear config while keeping the program.
+- **3) Trust All Tools** — Skip all permission prompts by writing `skipDangerousModePermissionPrompt` to `~/.claude/settings.json`.
+- **4) Uninstall** — Remove Claude Code and all its config files. You can also choose to only clear config while keeping the program.
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
