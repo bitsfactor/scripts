@@ -526,7 +526,7 @@ do_trust_all() {
     echo -e "\n${BLUE}=== Trust All Tools ===${NC}"
 
     if [ "$(id -u)" = "0" ]; then
-        echo -e "\n${YELLOW}[Notice] Running as root — will set bypass permissions mode in settings.json.${NC}"
+        echo -e "\n${YELLOW}[Notice] Running as root — will use dontAsk mode with full tool allowlist.${NC}"
     fi
 
     # ---- Check python3 ----
@@ -546,8 +546,8 @@ do_trust_all() {
         repair_settings_json
     fi
 
-    # ---- Write permission bypass settings ----
-    echo -e "\n${BLUE}[Step 2/2] Writing permission bypass settings...${NC}"
+    # ---- Write trust-all settings ----
+    echo -e "\n${BLUE}[Step 2/2] Writing trust-all settings...${NC}"
 
     local tmp_py
     tmp_py=$(mktemp)
@@ -555,22 +555,27 @@ do_trust_all() {
 
     cat > "$tmp_py" << 'PYEOF'
 import json, sys
+
 file = sys.argv[1]
 with open(file) as f:
     data = json.load(f)
 
 changes = []
 
-# 1) skipDangerousModePermissionPrompt
-if data.get("skipDangerousModePermissionPrompt") is not True:
-    data["skipDangerousModePermissionPrompt"] = True
-    changes.append("skipDangerousModePermissionPrompt")
+# Remove legacy bypassPermissions settings
+if "skipDangerousModePermissionPrompt" in data:
+    del data["skipDangerousModePermissionPrompt"]
+    changes.append("removedLegacy")
 
-# 2) permissions.defaultMode = "bypassPermissions"
+# Use dontAsk + full allowlist (works for both root and non-root)
 perms = data.setdefault("permissions", {})
-if perms.get("defaultMode") != "bypassPermissions":
-    perms["defaultMode"] = "bypassPermissions"
-    changes.append("bypassPermissions")
+all_tools = ["Bash", "Read", "Edit", "Write", "WebFetch", "WebSearch",
+             "Glob", "Grep", "NotebookEdit", "Agent", "MCP"]
+
+if perms.get("defaultMode") != "dontAsk" or sorted(perms.get("allow", [])) != sorted(all_tools):
+    perms["defaultMode"] = "dontAsk"
+    perms["allow"] = all_tools
+    changes.append("dontAsk+allowAll")
 
 with open(file, "w") as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
@@ -588,10 +593,10 @@ PYEOF
     if [ "$result" = "already" ]; then
         echo -e "  ${CYAN}Already set — no changes needed.${NC}"
     else
-        [[ "$result" == *skipDangerousModePermissionPrompt* ]] && \
-            echo -e "  ${GREEN}✓${NC} skipDangerousModePermissionPrompt = true"
-        [[ "$result" == *bypassPermissions* ]] && \
-            echo -e "  ${GREEN}✓${NC} permissions.defaultMode = bypassPermissions"
+        [[ "$result" == *dontAsk+allowAll* ]] && \
+            echo -e "  ${GREEN}✓${NC} permissions.defaultMode = dontAsk + allow all tools"
+        [[ "$result" == *removedLegacy* ]] && \
+            echo -e "  ${GREEN}✓${NC} Removed legacy bypassPermissions settings"
     fi
 
     echo -e "\n${GREEN}[Success] Permission prompts will no longer appear.${NC}"

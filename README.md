@@ -49,7 +49,7 @@ Install / update, configure, or uninstall Claude Code.
 
 - **1) Install / Update** — Install Claude Code, or update it if already installed. Automatically detects the install method (npm, Homebrew, official installer) and runs the matching upgrade command.
 - **2) Set API** — Enter your API endpoint and key. The script saves them and cleans up any old config automatically.
-- **3) Trust All Tools** — Skip all permission prompts by writing `skipDangerousModePermissionPrompt` to `~/.claude/settings.json`.
+- **3) Trust All Tools** — Skip all permission prompts.
 - **4) Uninstall** — Remove Claude Code and all its config files. You can also choose to only clear config while keeping the program.
 
 ```bash
