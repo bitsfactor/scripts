@@ -12,13 +12,16 @@
 
 set -e
 
+# CDN base URL (can be overridden externally)
+: "${CDN_BASE:=https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main}"
+
 # Load unified version
 _SCRIPT_DIR=""
 [ -n "${BASH_SOURCE[0]}" ] && _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd 2>/dev/null)"
 if [ -n "$_SCRIPT_DIR" ] && [ -f "$_SCRIPT_DIR/version.sh" ]; then
     . "$_SCRIPT_DIR/version.sh"
 else
-    eval "$(curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/version.sh 2>/dev/null)" 2>/dev/null || true
+    eval "$(curl -fsSL "${CDN_BASE}/version.sh" 2>/dev/null)" 2>/dev/null || true
 fi
 : "${VERSION:=0.0.0}"
 
@@ -37,8 +40,6 @@ tty_read() {
     [ -n "$2" ] && printf '%s' "$2" > /dev/tty
     IFS= read -r "$1" < /dev/tty || true
 }
-
-CDN_BASE="https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main"
 
 # OS detection
 case "$(uname -s | tr '[:upper:]' '[:lower:]')" in
