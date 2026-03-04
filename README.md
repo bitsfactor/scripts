@@ -2,6 +2,18 @@
 
 A collection of bootstrap scripts for developers. All scripts support **macOS** and **Linux**, and run independently via `curl | bash`. All scripts share a single version number defined in `version.sh`.
 
+## Quick Start
+
+**jsDelivr CDN** (faster, may have cache delay):
+```bash
+curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/<script> | bash
+```
+
+**GitHub Raw** (always latest):
+```bash
+curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/<script> | bash
+```
+
 ## one.sh — One-Click VPS Setup
 
 One command to fully initialize a new VPS. Downloads and orchestrates `env.sh`, `git.sh`, and `claude.sh` in sequence — each step asks for confirmation before running, so you can skip anything you don't need.
@@ -11,10 +23,6 @@ One command to fully initialize a new VPS. Downloads and orchestrates `env.sh`, 
 - **Step 3** Install Claude Code (claude.sh install)
 - **Step 4** Configure API (claude.sh set-api)
 - **Step 5** Trust All Tools (claude.sh trust-all) — Linux only
-
-```bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/one.sh | bash
-```
 
 ## env.sh — Development Environment Setup
 
@@ -28,20 +36,12 @@ One-command setup for a complete development environment on any fresh macOS or L
 - **6) Install Go** — Installs Go via Homebrew (macOS) or downloads the official SDK to `~/.go_sdk` (Linux, no sudo required). Writes `GOROOT`/`PATH` to shell config.
 - **7) Install / Update OOSP** — Fetch OOSP spec from CDN and append to `~/.claude/CLAUDE.md` or project-level `CLAUDE.md`. Supports Chinese and English.
 
-```bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/env.sh | bash
-```
-
 ## git.sh — SSH Key Manager
 
 The fastest way to set up GitHub SSH access across all your machines. Designed for solo developers who manage multiple VPS instances — generate a key pair once on your main computer, then share the same private key to every new server. No more repeated key generation or manual config.
 
 - **1) Retrieve Keys** — Run on your main computer. Gets your SSH key pair (or generates one if none exists) and copies the private key to clipboard. Add the public key to [GitHub SSH Settings](https://github.com/settings/keys) once.
 - **2) Set Key** — Run on any new VPS or Mac. Paste your private key and the script handles the rest. Once done, you can `git clone` private repos immediately.
-
-```bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
-```
 
 ## claude.sh — Claude Code Setup
 
@@ -52,17 +52,9 @@ Install / update, configure, or uninstall Claude Code.
 - **3) Trust All Tools** — Skip all permission prompts.
 - **4) Uninstall** — Remove Claude Code and all its config files. You can also choose to only clear config while keeping the program.
 
-```bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
-```
-
 ## pytools.sh — Python Tools Installer
 
 One-click deploy Python command-line tools to `~/pytools`. Downloads each tool from CDN, installs Python dependencies, and adds `~/pytools` to `PATH` — so every tool is callable by name from anywhere in the terminal.
 
 - **1) Install / Update** — Downloads all Python tools to `~/pytools`, installs required dependencies into an isolated virtual environment (`~/pytools/.venv/`), and writes the `~/pytools` PATH block to your shell config.
 - **2) Uninstall** — Removes the `~/pytools/` directory and cleans up the PATH block from all shell config files.
-
-```bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/pytools.sh | bash
-```
