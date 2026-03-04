@@ -519,15 +519,14 @@ EOF
 }
 
 # =============================================================================
-# 3) Trust All Tools — write skipDangerousModePermissionPrompt to settings.json
+# 3) Trust All Tools — write permission bypass settings to settings.json
 # =============================================================================
 
 do_trust_all() {
     echo -e "\n${BLUE}=== Trust All Tools ===${NC}"
 
     if [ "$(id -u)" = "0" ]; then
-        echo -e "\n${YELLOW}[Notice] Running as root — --dangerously-skip-permissions is blocked by Claude Code.${NC}"
-        echo -e "${YELLOW}Writing skipDangerousModePermissionPrompt to settings.json instead.${NC}"
+        echo -e "\n${YELLOW}[Notice] Running as root — will set bypass permissions mode in settings.json.${NC}"
     fi
 
     # ---- Check python3 ----
@@ -547,8 +546,8 @@ do_trust_all() {
         repair_settings_json
     fi
 
-    # ---- Write the key ----
-    echo -e "\n${BLUE}[Step 2/2] Writing skipDangerousModePermissionPrompt...${NC}"
+    # ---- Write permission bypass settings ----
+    echo -e "\n${BLUE}[Step 2/2] Writing permission bypass settings...${NC}"
 
     local tmp_py
     tmp_py=$(mktemp)
@@ -559,12 +558,25 @@ import json, sys
 file = sys.argv[1]
 with open(file) as f:
     data = json.load(f)
-already = data.get("skipDangerousModePermissionPrompt") is True
-data["skipDangerousModePermissionPrompt"] = True
+
+changes = []
+
+# 1) skipDangerousModePermissionPrompt
+if data.get("skipDangerousModePermissionPrompt") is not True:
+    data["skipDangerousModePermissionPrompt"] = True
+    changes.append("skipDangerousModePermissionPrompt")
+
+# 2) permissions.defaultMode = "bypassPermissions"
+perms = data.setdefault("permissions", {})
+if perms.get("defaultMode") != "bypassPermissions":
+    perms["defaultMode"] = "bypassPermissions"
+    changes.append("bypassPermissions")
+
 with open(file, "w") as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
     f.write("\n")
-print("already" if already else "written")
+
+print(",".join(changes) if changes else "already")
 PYEOF
 
     local result
@@ -576,7 +588,10 @@ PYEOF
     if [ "$result" = "already" ]; then
         echo -e "  ${CYAN}Already set — no changes needed.${NC}"
     else
-        echo -e "  ${GREEN}✓${NC} skipDangerousModePermissionPrompt = true"
+        [[ "$result" == *skipDangerousModePermissionPrompt* ]] && \
+            echo -e "  ${GREEN}✓${NC} skipDangerousModePermissionPrompt = true"
+        [[ "$result" == *bypassPermissions* ]] && \
+            echo -e "  ${GREEN}✓${NC} permissions.defaultMode = bypassPermissions"
     fi
 
     echo -e "\n${GREEN}[Success] Permission prompts will no longer appear.${NC}"
