@@ -56,7 +56,7 @@ esac
 
 # ---- Constants ----
 
-CDN_BASE="https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/pytools"
+CDN_PYTOOLS="${CDN_BASE}/pytools"
 PYTOOLS_DIR="$HOME/pytools"
 PYTOOLS_FILES=("dogecloud.py")
 PYTOOLS_DEPS=("requests" "boto3")
@@ -205,7 +205,7 @@ do_install() {
     # Step 3/6: Download tools and create wrappers
     echo -e "\n${BLUE}[Step 3/6] Downloading tools...${NC}"
     for py_file in "${PYTOOLS_FILES[@]}"; do
-        url="${CDN_BASE}/${py_file}"
+        url="${CDN_PYTOOLS}/${py_file}"
         dest="${PYTOOLS_DIR}/${py_file}"
         echo -e "  Downloading ${CYAN}${py_file}${NC}..."
         if ! curl -fsSL "$url" -o "$dest"; then

@@ -438,8 +438,8 @@ do_install_oosp() {
     local GLOBAL_CLAUDE="$HOME/.claude/CLAUDE.md"
     local PROJECT_CLAUDE="$(pwd)/CLAUDE.md"
 
-    local CDN_CN="https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/spec/oosp-cn.md"
-    local CDN_EN="https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/spec/oosp-en.md"
+    local CDN_CN="${CDN_BASE}/spec/oosp-cn.md"
+    local CDN_EN="${CDN_BASE}/spec/oosp-en.md"
 
     # _sed_inplace: cross-platform sed -i wrapper
     _sed_inplace() {
