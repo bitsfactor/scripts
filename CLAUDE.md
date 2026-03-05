@@ -29,12 +29,8 @@ bash git.sh
 bash claude.sh
 bash pytools.sh
 
-# 远程执行（主要使用方式）
-BFS_VER=1.3.1; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh | BFS_VER=$BFS_VER bash
-BFS_VER=1.3.1; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/env.sh | BFS_VER=$BFS_VER bash
-BFS_VER=1.3.1; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/git.sh | BFS_VER=$BFS_VER bash
-BFS_VER=1.3.1; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/claude.sh | BFS_VER=$BFS_VER bash
-BFS_VER=1.3.1; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/pytools.sh | BFS_VER=$BFS_VER bash
+# 远程执行（主要使用方式，具体版本号见 README.md）
+BFS_VER=<ver>; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/<script>.sh | BFS_VER=$BFS_VER bash
 ```
 
 ## 脚本规范
@@ -51,7 +47,7 @@ BFS_VER=1.3.1; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BF
 2. 同步版本到文档中的 `BFS_VER=` 赋值（macOS 用 `sed -i ''`，Linux 用 `sed -i`）：
    ```bash
    VER=$(sed -n 's/^VERSION="\(.*\)"/\1/p' version.sh)
-   sed -i '' "s/BFS_VER=[0-9.]*;/BFS_VER=$VER;/g" README.md CLAUDE.md one.sh env.sh git.sh claude.sh pytools.sh
+   sed -i '' "s/BFS_VER=[0-9.]*;/BFS_VER=$VER;/g" README.md
    ```
 3. 提交、打 tag、推送：
    ```bash

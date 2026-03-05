@@ -7,7 +7,6 @@
 #
 # Usage:
 #   bash one.sh
-#   BFS_VER=1.3.1; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh | BFS_VER=$BFS_VER bash
 # =============================================================================
 
 set -e

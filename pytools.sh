@@ -7,7 +7,6 @@
 #
 # Usage:
 #   bash pytools.sh
-#   BFS_VER=1.3.1; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/pytools.sh | BFS_VER=$BFS_VER bash
 # =============================================================================
 
 set -e
