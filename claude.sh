@@ -856,15 +856,122 @@ do_uninstall() {
 }
 
 # =============================================================================
+# 5) Install / Update oosp
+# =============================================================================
+
+do_install_oosp() {
+    echo -e "\n${BLUE}=== Install / Update oosp ===${NC}"
+
+    local OOSP_START="# OOSP (Object-Oriented Standardized Programming)"
+    local OOSP_END="# OOSP END"
+
+    local GLOBAL_CLAUDE="$HOME/.claude/CLAUDE.md"
+    local PROJECT_CLAUDE="$(pwd)/CLAUDE.md"
+
+    local CDN_CN="${CDN_BASE}/spec/oosp-cn.md"
+    local CDN_EN="${CDN_BASE}/spec/oosp-en.md"
+
+    # ---- Step 1: Remove existing oosp ----
+    echo -e "\n${BLUE}[Step 1/3] Scanning for existing oosp content...${NC}"
+
+    local cleaned
+    for file in "$GLOBAL_CLAUDE" "$PROJECT_CLAUDE"; do
+        if [ ! -f "$file" ]; then
+            continue
+        fi
+        cleaned=false
+
+        if grep -qF "$OOSP_START" "$file" 2>/dev/null; then
+            sed_inplace "/$OOSP_START/,/$OOSP_END/d" "$file"
+            cleaned=true
+        fi
+
+        if [ "$cleaned" = true ]; then
+            echo -e "  ${GREEN}✓${NC} Removed oosp from ${file/#$HOME/~}"
+        else
+            echo -e "  ${YELLOW}[Skip]${NC} No oosp content found in ${file/#$HOME/~}"
+        fi
+    done
+
+    # ---- Step 2: Ask user where to write ----
+    echo -e "\n${BLUE}[Step 2/3] Choose target location...${NC}"
+    echo -e "${CYAN}Write oosp to:${NC}"
+    echo -e "  ${GREEN}1)${NC} User level    (~/.claude/CLAUDE.md)"
+    echo -e "  ${GREEN}2)${NC} Project level (${PROJECT_CLAUDE/#$HOME/~})"
+    echo -e "  ${RED}0)${NC} Cancel"
+    echo ""
+    tty_read LOC_CHOICE "Enter option (0/1/2): "
+
+    local TARGET_FILE=""
+    case "$LOC_CHOICE" in
+        1) TARGET_FILE="$GLOBAL_CLAUDE" ;;
+        2) TARGET_FILE="$PROJECT_CLAUDE" ;;
+        0|"")
+            echo -e "${YELLOW}Cancelled.${NC}"
+            return
+            ;;
+        *)
+            echo -e "${RED}[Error] Invalid option: $LOC_CHOICE${NC}"
+            return 1
+            ;;
+    esac
+
+    # ---- Step 3: Choose language and fetch ----
+    echo -e "\n${BLUE}[Step 3/3] Choose language and install...${NC}"
+    echo -e "${CYAN}Language:${NC}"
+    echo -e "  ${GREEN}1)${NC} 中文 (oosp-cn.md)"
+    echo -e "  ${GREEN}2)${NC} English (oosp-en.md)"
+    echo -e "  ${RED}0)${NC} Cancel"
+    echo ""
+    tty_read LANG_CHOICE "Enter option (0/1/2): "
+
+    local CDN_URL=""
+    case "$LANG_CHOICE" in
+        1) CDN_URL="$CDN_CN" ;;
+        2) CDN_URL="$CDN_EN" ;;
+        0|"")
+            echo -e "${YELLOW}Cancelled.${NC}"
+            return
+            ;;
+        *)
+            echo -e "${RED}[Error] Invalid option: $LANG_CHOICE${NC}"
+            return 1
+            ;;
+    esac
+
+    echo -e "${BLUE}Fetching oosp content from CDN...${NC}"
+    local oosp_content
+    oosp_content=$(curl -fsSL "$CDN_URL" 2>/dev/null)
+    if [ -z "$oosp_content" ]; then
+        echo -e "${RED}[Error] Failed to fetch oosp content from CDN.${NC}"
+        return 1
+    fi
+
+    mkdir -p "$(dirname "$TARGET_FILE")"
+    touch "$TARGET_FILE"
+
+    if [ -s "$TARGET_FILE" ]; then
+        printf '\n%s\n%s\n' "$oosp_content" "$OOSP_END" >> "$TARGET_FILE"
+    else
+        printf '%s\n%s\n' "$oosp_content" "$OOSP_END" >> "$TARGET_FILE"
+    fi
+
+    local display="${TARGET_FILE/#$HOME/~}"
+    echo -e "  ${GREEN}✓${NC} oosp written to ${display}"
+    echo -e "\n${GREEN}[Success] oosp installed to ${display}!${NC}"
+}
+
+# =============================================================================
 # CLI parameter handling — direct subcommand execution
 # =============================================================================
 
 if [ $# -gt 0 ]; then
     case "$1" in
-        install)   do_install ;;
-        set-api)   do_set_api ;;
-        trust-all) do_trust_all ;;
-        uninstall) do_uninstall ;;
+        install)      do_install ;;
+        set-api)      do_set_api ;;
+        trust-all)    do_trust_all ;;
+        install-oosp) do_install_oosp ;;
+        uninstall)    do_uninstall ;;
         *) echo -e "${RED}[Error] Unknown command: $1${NC}"; exit 1 ;;
     esac
     exit 0
@@ -881,17 +988,19 @@ echo -e "${CYAN}Select an option:${NC}"
 echo -e "  ${GREEN}1)${NC} Install / Update Claude Code"
 echo -e "  ${GREEN}2)${NC} Set API"
 echo -e "  ${GREEN}3)${NC} Trust All Tools"
-echo -e "  ${RED}4)${NC} Uninstall Claude Code"
+echo -e "  ${GREEN}4)${NC} Install / Update oosp"
+echo -e "  ${RED}5)${NC} Uninstall Claude Code"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
 stty sane < /dev/tty 2>/dev/null || true
-tty_read MENU_CHOICE "Enter option (0/1/2/3/4): "
+tty_read MENU_CHOICE "Enter option (0-5): "
 
 case "$MENU_CHOICE" in
     1) do_install ;;
     2) do_set_api ;;
     3) do_trust_all ;;
-    4) do_uninstall ;;
+    4) do_install_oosp ;;
+    5) do_uninstall ;;
     0|"")
         echo -e "${YELLOW}Exited.${NC}"
         exit 0

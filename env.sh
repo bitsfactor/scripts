@@ -2,7 +2,7 @@
 
 # =============================================================================
 # BitsFactor Environment Setup Tool
-# Auto-configure development environment: Homebrew, Git, Python3, Node.js, Go.
+# Auto-configure development environment: Homebrew, Git, Python3, Node.js, Go, Docker.
 # Supports macOS and Linux (Debian / Ubuntu).
 #
 # Usage:
@@ -382,27 +382,148 @@ do_install_go() {
 }
 
 # =============================================================================
+# 6) Install Docker
+# =============================================================================
+
+do_install_docker() {
+    echo -e "\n${BLUE}=== Install Docker ===${NC}"
+
+    if command -v docker &> /dev/null; then
+        echo -e "${GREEN}[Skip] Docker is already installed: $(docker --version)${NC}"
+        return 0
+    fi
+
+    echo -e "${BLUE}Installing Docker...${NC}"
+
+    if [ "$OS_TYPE" = "macos" ]; then
+        if ! command -v brew &> /dev/null; then
+            echo -e "${RED}[Error] Homebrew is required to install Docker on macOS.${NC}"
+            echo -e "${YELLOW}Please install Homebrew first (run this script and select 'Install Homebrew').${NC}"
+            return 1
+        fi
+        brew install --cask docker || return 1
+        open -a Docker
+    else
+        # Linux: use official convenience script (supports Debian, Ubuntu, etc.)
+        local tmp_docker
+        tmp_docker=$(mktemp)
+        if ! curl -fsSL "https://get.docker.com" -o "$tmp_docker"; then
+            echo -e "${RED}[Error] Failed to download Docker installer.${NC}"
+            rm -f "$tmp_docker"
+            return 1
+        fi
+        local SUDO=""
+        [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+        $SUDO sh "$tmp_docker" || { rm -f "$tmp_docker"; echo -e "${RED}[Error] Docker installation failed.${NC}"; return 1; }
+        rm -f "$tmp_docker"
+
+        # Add current user to docker group (avoid needing sudo for docker commands)
+        if [ "$(id -u)" -ne 0 ]; then
+            $SUDO usermod -aG docker "$USER" 2>/dev/null || true
+            echo -e "  ${GREEN}✓${NC} Added ${USER} to docker group (re-login to take effect)"
+        fi
+    fi
+
+    echo -e "${GREEN}[Success] $(docker --version)${NC}"
+    # docker compose (v2) is included:
+    #   Linux: get.docker.com installs docker-compose-plugin
+    #   macOS: Docker Desktop bundles it
+    if docker compose version &> /dev/null; then
+        echo -e "${GREEN}         $(docker compose version)${NC}"
+    fi
+}
+
+# =============================================================================
+# 7) Change SSH Port (Linux only)
+# =============================================================================
+
+do_change_ssh_port() {
+    echo -e "\n${BLUE}=== Change SSH Port ===${NC}"
+
+    if [ "$OS_TYPE" != "linux" ]; then
+        echo -e "${YELLOW}[Skip] This option is for Linux only.${NC}"
+        return 0
+    fi
+
+    local SSHD_CONFIG="/etc/ssh/sshd_config"
+    if [ ! -f "$SSHD_CONFIG" ]; then
+        echo -e "${RED}[Error] ${SSHD_CONFIG} not found.${NC}"
+        return 1
+    fi
+
+    local SUDO=""
+    [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+
+    # Show current port
+    local CURRENT_PORT
+    CURRENT_PORT=$(grep -E '^Port ' "$SSHD_CONFIG" 2>/dev/null | awk '{print $2}' | tail -1)
+    : "${CURRENT_PORT:=22}"
+    echo -e "Current SSH port: ${CYAN}${CURRENT_PORT}${NC}"
+
+    # Get new port: use $1 if provided, otherwise prompt interactively
+    local NEW_PORT="${1:-}"
+    if [ -z "$NEW_PORT" ]; then
+        read -rp "Enter new SSH port [60101]: " NEW_PORT < /dev/tty
+        : "${NEW_PORT:=60101}"
+    fi
+
+    # Validate
+    if ! [[ "$NEW_PORT" =~ ^[0-9]+$ ]] || [ "$NEW_PORT" -lt 1024 ] || [ "$NEW_PORT" -gt 65535 ]; then
+        echo -e "${RED}[Error] Invalid port: ${NEW_PORT}. Must be 1024–65535.${NC}"
+        return 1
+    fi
+
+    if [ "$NEW_PORT" = "$CURRENT_PORT" ]; then
+        echo -e "${YELLOW}[Skip] Port is already ${NEW_PORT}.${NC}"
+        return 0
+    fi
+
+    # Modify sshd_config
+    echo -e "${BLUE}Setting SSH port to ${NEW_PORT}...${NC}"
+    if grep -qE '^#?Port ' "$SSHD_CONFIG"; then
+        $SUDO sed -i "s/^#\?Port .*/Port ${NEW_PORT}/" "$SSHD_CONFIG"
+    else
+        echo "Port ${NEW_PORT}" | $SUDO tee -a "$SSHD_CONFIG" > /dev/null
+    fi
+
+    # Restart sshd
+    echo -e "${BLUE}Restarting sshd...${NC}"
+    if $SUDO systemctl restart sshd 2>/dev/null || $SUDO systemctl restart ssh 2>/dev/null; then
+        echo -e "${GREEN}[Success] SSH port changed to ${NEW_PORT}.${NC}"
+    else
+        echo -e "${RED}[Error] Failed to restart sshd. Please restart manually.${NC}"
+        return 1
+    fi
+
+    echo -e "\n${YELLOW}[Important] Before closing this session:${NC}"
+    echo -e "  1. Ensure firewall allows port ${NEW_PORT}"
+    echo -e "  2. Test new connection: ${CYAN}ssh -p ${NEW_PORT} user@host${NC}"
+}
+
+# =============================================================================
 # Install All
 # =============================================================================
 
 do_install_all() {
     echo -e "\n${BLUE}=== Install All ===${NC}"
     if [ "$OS_TYPE" = "macos" ]; then
-        echo -e "${CYAN}Installing: Brew + Git + Python3 + Node.js + Go${NC}\n"
+        echo -e "${CYAN}Installing: Brew + Git + Python3 + Node.js + Go + Docker${NC}\n"
     else
-        echo -e "${CYAN}Installing: Git + Python3 + Node.js + Go${NC}\n"
+        echo -e "${CYAN}Installing: Git + Python3 + Node.js + Go + Docker + SSH Port${NC}\n"
     fi
 
     # Track per-step result (0 = ok, 1 = failed) for the summary.
     # Each function uses explicit || return 1 on critical commands so that
     # failures are reported accurately on both bash 3.x and bash 5.x,
     # regardless of whether set -e is inherited in the || call context.
-    local brew_rc=0 git_rc=0 python_rc=0 node_rc=0 go_rc=0
-    do_install_brew   || brew_rc=1
-    do_install_git    || git_rc=1
-    do_install_python || python_rc=1
-    do_install_node   || node_rc=1
-    do_install_go     || go_rc=1
+    local brew_rc=0 git_rc=0 python_rc=0 node_rc=0 go_rc=0 docker_rc=0 ssh_rc=0
+    do_install_brew    || brew_rc=1
+    do_install_git     || git_rc=1
+    do_install_python  || python_rc=1
+    do_install_node    || node_rc=1
+    do_install_go      || go_rc=1
+    do_install_docker  || docker_rc=1
+    do_change_ssh_port 60101 || ssh_rc=1
 
     local SHELL_RC_DISPLAY="${SHELL_RC/#$HOME/~}"
 
@@ -417,132 +538,15 @@ do_install_all() {
     [ "$python_rc"  -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Python3"      || echo -e "  ${RED}✗${NC}  Python3"
     [ "$node_rc"    -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Node.js"      || echo -e "  ${RED}✗${NC}  Node.js"
     [ "$go_rc"      -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Go"           || echo -e "  ${RED}✗${NC}  Go"
+    [ "$docker_rc"  -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Docker"       || echo -e "  ${RED}✗${NC}  Docker"
+    # SSH Port is Linux-only; omit from summary on macOS
+    if [ "$OS_TYPE" = "linux" ]; then
+        [ "$ssh_rc"     -eq 0 ] && echo -e "  ${GREEN}✓${NC}  SSH Port"    || echo -e "  ${RED}✗${NC}  SSH Port"
+    fi
     echo -e "${CYAN}========================================${NC}"
 
     echo -e "\n${YELLOW}[Reminder] To apply PATH changes in your current terminal:${NC}"
     echo -e "  ${CYAN}source ${SHELL_RC_DISPLAY}${NC}"
-}
-
-# =============================================================================
-# 7) Install / Update OOSP
-# =============================================================================
-
-do_install_oosp() {
-    echo -e "\n${BLUE}=== Install / Update OOSP ===${NC}"
-
-    local OOSP_START="# OOSP (Object-Oriented Standardized Programming)"
-    local OOSP_END="# OOSP END"
-
-    local GLOBAL_CLAUDE="$HOME/.claude/CLAUDE.md"
-    local PROJECT_CLAUDE="$(pwd)/CLAUDE.md"
-
-    local CDN_CN="${CDN_BASE}/spec/oosp-cn.md"
-    local CDN_EN="${CDN_BASE}/spec/oosp-en.md"
-
-    # _sed_inplace: cross-platform sed -i wrapper
-    _sed_inplace() {
-        if [ "$OS_TYPE" = "macos" ]; then
-            sed -i '' "$1" "$2"
-        else
-            sed -i "$1" "$2"
-        fi
-    }
-
-    # ---- Step 1: Remove existing OOSP ----
-    echo -e "\n${BLUE}[Step 1/3] Scanning for existing OOSP content...${NC}"
-
-    local cleaned
-    for file in "$GLOBAL_CLAUDE" "$PROJECT_CLAUDE"; do
-        if [ ! -f "$file" ]; then
-            continue
-        fi
-        cleaned=false
-
-        if grep -qF "$OOSP_START" "$file" 2>/dev/null; then
-            _sed_inplace "/$OOSP_START/,/$OOSP_END/d" "$file"
-            cleaned=true
-        fi
-
-        if [ "$cleaned" = true ]; then
-            echo -e "  ${GREEN}✓${NC} Removed OOSP from ${file/#$HOME/~}"
-        else
-            echo -e "  ${YELLOW}[Skip]${NC} No OOSP content found in ${file/#$HOME/~}"
-        fi
-    done
-
-    # ---- Step 2: Ask user where to write ----
-    echo -e "\n${BLUE}[Step 2/3] Choose target location...${NC}"
-    echo -e "${CYAN}Write OOSP to:${NC}"
-    echo -e "  ${GREEN}1)${NC} User level    (~/.claude/CLAUDE.md)"
-    echo -e "  ${GREEN}2)${NC} Project level (${PROJECT_CLAUDE/#$HOME/~})"
-    echo -e "  ${RED}0)${NC} Cancel"
-    echo ""
-    read -p "Enter option (0/1/2): " LOC_CHOICE < /dev/tty
-
-    local TARGET_FILE=""
-    case "$LOC_CHOICE" in
-        1) TARGET_FILE="$GLOBAL_CLAUDE" ;;
-        2) TARGET_FILE="$PROJECT_CLAUDE" ;;
-        0|"")
-            echo -e "${YELLOW}Cancelled.${NC}"
-            unset -f _sed_inplace
-            return
-            ;;
-        *)
-            echo -e "${RED}[Error] Invalid option: $LOC_CHOICE${NC}"
-            unset -f _sed_inplace
-            return 1
-            ;;
-    esac
-
-    # ---- Step 3: Choose language and fetch ----
-    echo -e "\n${BLUE}[Step 3/3] Choose language and install...${NC}"
-    echo -e "${CYAN}Language:${NC}"
-    echo -e "  ${GREEN}1)${NC} 中文 (oosp-cn.md)"
-    echo -e "  ${GREEN}2)${NC} English (oosp-en.md)"
-    echo -e "  ${RED}0)${NC} Cancel"
-    echo ""
-    read -p "Enter option (0/1/2): " LANG_CHOICE < /dev/tty
-
-    local CDN_URL=""
-    case "$LANG_CHOICE" in
-        1) CDN_URL="$CDN_CN" ;;
-        2) CDN_URL="$CDN_EN" ;;
-        0|"")
-            echo -e "${YELLOW}Cancelled.${NC}"
-            unset -f _sed_inplace
-            return
-            ;;
-        *)
-            echo -e "${RED}[Error] Invalid option: $LANG_CHOICE${NC}"
-            unset -f _sed_inplace
-            return 1
-            ;;
-    esac
-
-    echo -e "${BLUE}Fetching OOSP content from CDN...${NC}"
-    local oosp_content
-    oosp_content=$(curl -fsSL "$CDN_URL" 2>/dev/null)
-    if [ -z "$oosp_content" ]; then
-        echo -e "${RED}[Error] Failed to fetch OOSP content from CDN.${NC}"
-        unset -f _sed_inplace
-        return 1
-    fi
-
-    mkdir -p "$(dirname "$TARGET_FILE")"
-    touch "$TARGET_FILE"
-
-    if [ -s "$TARGET_FILE" ]; then
-        printf '\n%s\n%s\n' "$oosp_content" "$OOSP_END" >> "$TARGET_FILE"
-    else
-        printf '%s\n%s\n' "$oosp_content" "$OOSP_END" >> "$TARGET_FILE"
-    fi
-
-    local display="${TARGET_FILE/#$HOME/~}"
-    echo -e "  ${GREEN}✓${NC} OOSP written to ${display}"
-    echo -e "\n${GREEN}[Success] OOSP installed to ${display}!${NC}"
-
-    unset -f _sed_inplace
 }
 
 # =============================================================================
@@ -557,7 +561,8 @@ if [ $# -gt 0 ]; then
         install-python) do_install_python ;;
         install-node)   do_install_node ;;
         install-go)     do_install_go ;;
-        install-oosp)   do_install_oosp ;;
+        install-docker) do_install_docker ;;
+        ssh-port)       do_change_ssh_port ;;
         *) echo -e "${RED}[Error] Unknown command: $1${NC}"; exit 1 ;;
     esac
     exit 0
@@ -573,19 +578,20 @@ echo -e "Shell config:  ${CYAN}${SHELL_RC/#$HOME/~}${NC}\n"
 
 echo -e "${CYAN}Select an option:${NC}"
 if [ "$OS_TYPE" = "macos" ]; then
-    echo -e "  ${GREEN}1)${NC} Install All  (Brew + Git + Python3 + Node.js + Go)"
+    echo -e "  ${GREEN}1)${NC} Install All  (Brew + Git + Python3 + Node.js + Go + Docker)"
 else
-    echo -e "  ${GREEN}1)${NC} Install All  (Git + Python3 + Node.js + Go)"
+    echo -e "  ${GREEN}1)${NC} Install All  (Git + Python3 + Node.js + Go + Docker + SSH Port)"
 fi
 echo -e "  ${GREEN}2)${NC} Install Homebrew  ${YELLOW}[macOS only]${NC}"
 echo -e "  ${GREEN}3)${NC} Install Git"
 echo -e "  ${GREEN}4)${NC} Install Python3"
 echo -e "  ${GREEN}5)${NC} Install Node.js & npm"
 echo -e "  ${GREEN}6)${NC} Install Go"
-echo -e "  ${GREEN}7)${NC} Install / Update OOSP"
+echo -e "  ${GREEN}7)${NC} Install Docker"
+echo -e "  ${GREEN}8)${NC} Change SSH Port  ${YELLOW}[Linux only]${NC}"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
-read -p "Enter option (0-7): " MENU_CHOICE < /dev/tty
+read -p "Enter option (0-8): " MENU_CHOICE < /dev/tty
 
 case "$MENU_CHOICE" in
     1) do_install_all ;;
@@ -594,7 +600,8 @@ case "$MENU_CHOICE" in
     4) do_install_python ;;
     5) do_install_node ;;
     6) do_install_go ;;
-    7) do_install_oosp ;;
+    7) do_install_docker ;;
+    8) do_change_ssh_port ;;
     0|"")
         echo -e "${YELLOW}Exited.${NC}"
         exit 0
