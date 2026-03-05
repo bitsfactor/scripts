@@ -6,7 +6,9 @@ A collection of bootstrap scripts for developers. All scripts support **macOS** 
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/one.sh | bash
-# non-cached
+```
+
+```bash
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/one.sh | bash
 ```
 
@@ -22,7 +24,9 @@ One command to fully initialize a new VPS. Downloads and orchestrates `env.sh`, 
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/env.sh | bash
-# non-cached
+```
+
+```bash
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/env.sh | bash
 ```
 
@@ -41,7 +45,9 @@ One-command setup for a complete development environment on any fresh macOS or L
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/git.sh | bash
-# non-cached
+```
+
+```bash
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git.sh | bash
 ```
 
@@ -54,7 +60,9 @@ The fastest way to set up GitHub SSH access across all your machines. Designed f
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/claude.sh | bash
-# non-cached
+```
+
+```bash
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/claude.sh | bash
 ```
 
@@ -70,7 +78,9 @@ Install / update, configure, or uninstall Claude Code.
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/pytools.sh | bash
-# non-cached
+```
+
+```bash
 curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/pytools.sh | bash
 ```
 
