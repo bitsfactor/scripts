@@ -30,11 +30,11 @@ bash claude.sh
 bash pytools.sh
 
 # 远程执行（主要使用方式）
-curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/one.sh | bash
-curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/env.sh | bash
-curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
-curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/claude.sh | bash
-curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/pytools.sh | bash
+curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/one.sh | bash
+curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/env.sh | bash
+curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/git.sh | bash
+curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/claude.sh | bash
+curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/pytools.sh | bash
 ```
 
 ## 脚本规范
@@ -47,8 +47,17 @@ curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/pytools.sh | bash
 
 ## 发布流程
 
-每次 `git push` 到 remote 后，必须请求 jsDelivr purge 链接清除 CDN 缓存，确保远程执行拿到最新版本。对每个有变更的脚本文件都要清除：
+1. 修改 `version.sh` 中的版本号
+2. 同步版本到所有脚本（macOS 用 `sed -i ''`，Linux 用 `sed -i`）：
+   ```bash
+   VER=$(sed -n 's/^VERSION="\(.*\)"/\1/p' version.sh)
+   sed -i '' "s/^VERSION=\".*\"/VERSION=\"$VER\"/" one.sh env.sh git.sh claude.sh pytools.sh
+   ```
+3. 提交、打 tag、推送：
+   ```bash
+   git add -A && git commit -m "chore: bump version to $VER"
+   git tag "v$VER" && git push && git push --tags
+   ```
 
-```
-https://purge.jsdelivr.net/gh/bitsfactor/scripts@main/<filename>
-```
+每个 tag 在 jsdelivr 上不可变，无需清除 CDN 缓存。
+`@latest` 入口 URL 由 jsdelivr 自动解析，约 12 小时内更新。

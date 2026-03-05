@@ -7,23 +7,21 @@
 #
 # Usage:
 #   bash git.sh
-#   curl -s https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main/git.sh | bash
+#   curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/git.sh | bash
 # =============================================================================
 
 set -e
 
-# CDN base URL (can be overridden externally)
-: "${CDN_BASE:=https://gcore.jsdelivr.net/gh/bitsfactor/scripts@main}"
+# Version — synced from version.sh during release
+VERSION="1.2.2"
 
-# Load unified version
+# Load local version.sh override (for development)
 _SCRIPT_DIR=""
 [ -n "${BASH_SOURCE[0]}" ] && _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd 2>/dev/null)"
-if [ -n "$_SCRIPT_DIR" ] && [ -f "$_SCRIPT_DIR/version.sh" ]; then
-    . "$_SCRIPT_DIR/version.sh"
-else
-    eval "$(curl -fsSL "${CDN_BASE}/version.sh" 2>/dev/null)" 2>/dev/null || true
-fi
-: "${VERSION:=0.0.0}"
+[ -n "$_SCRIPT_DIR" ] && [ -f "$_SCRIPT_DIR/version.sh" ] && . "$_SCRIPT_DIR/version.sh"
+
+# CDN base URL — pinned to version tag (immutable, no purge needed)
+: "${CDN_BASE:=https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v${VERSION}}"
 
 # Color definitions
 GREEN='\033[32m'
