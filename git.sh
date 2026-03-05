@@ -213,35 +213,39 @@ do_set_key() {
         echo -e "${GREEN}You can now securely 'git clone' your private repositories.${NC}"
 
         # Configure Git identity
-        echo -e "\n${BLUE}[Step 5/5] Configuring Git identity...${NC}"
-        local CURRENT_NAME CURRENT_EMAIL
-        CURRENT_NAME=$(git config --global user.name 2>/dev/null || true)
-        CURRENT_EMAIL=$(git config --global user.email 2>/dev/null || true)
-
-        if [ -n "$CURRENT_NAME" ] && [ -n "$CURRENT_EMAIL" ]; then
-            echo -e "${GREEN}[Skip] Git identity already configured: ${CURRENT_NAME} <${CURRENT_EMAIL}>${NC}"
+        if ! command -v git &> /dev/null; then
+            echo -e "\n${YELLOW}[Skip] Git is not installed. Skipping identity configuration.${NC}"
         else
-            # Extract GitHub username from SSH output: "Hi username! ..."
-            local GH_USER=""
-            GH_USER=$(echo "$SSH_OUTPUT" | sed -n 's/.*Hi \([^!]*\)!.*/\1/p')
+            echo -e "\n${BLUE}[Step 5/5] Configuring Git identity...${NC}"
+            local CURRENT_NAME CURRENT_EMAIL
+            CURRENT_NAME=$(git config --global user.name 2>/dev/null || true)
+            CURRENT_EMAIL=$(git config --global user.email 2>/dev/null || true)
 
-            local DEFAULT_NAME="${CURRENT_NAME:-${GH_USER:-}}"
-            local DEFAULT_EMAIL="${CURRENT_EMAIL:-${GH_USER:+${GH_USER}@users.noreply.github.com}}"
-
-            echo -e "${YELLOW}Git user.name and user.email are not configured.${NC}"
-            local input_name input_email
-            tty_read input_name "  Git user.name [${DEFAULT_NAME}]: "
-            [ -z "$input_name" ] && input_name="$DEFAULT_NAME"
-
-            tty_read input_email "  Git user.email [${DEFAULT_EMAIL}]: "
-            [ -z "$input_email" ] && input_email="$DEFAULT_EMAIL"
-
-            if [ -n "$input_name" ] && [ -n "$input_email" ]; then
-                git config --global user.name "$input_name"
-                git config --global user.email "$input_email"
-                echo -e "${GREEN}[Success] Git identity: ${input_name} <${input_email}>${NC}"
+            if [ -n "$CURRENT_NAME" ] && [ -n "$CURRENT_EMAIL" ]; then
+                echo -e "${GREEN}[Skip] Git identity already configured: ${CURRENT_NAME} <${CURRENT_EMAIL}>${NC}"
             else
-                echo -e "${YELLOW}[Skip] Git identity not configured (empty input).${NC}"
+                # Extract GitHub username from SSH output: "Hi username! ..."
+                local GH_USER=""
+                GH_USER=$(echo "$SSH_OUTPUT" | sed -n 's/.*Hi \([^!]*\)!.*/\1/p')
+
+                local DEFAULT_NAME="${CURRENT_NAME:-${GH_USER:-}}"
+                local DEFAULT_EMAIL="${CURRENT_EMAIL:-${GH_USER:+${GH_USER}@users.noreply.github.com}}"
+
+                echo -e "${YELLOW}Git identity is incomplete. Please confirm:${NC}"
+                local input_name input_email
+                tty_read input_name "  Git user.name [${DEFAULT_NAME}]: "
+                [ -z "$input_name" ] && input_name="$DEFAULT_NAME"
+
+                tty_read input_email "  Git user.email [${DEFAULT_EMAIL}]: "
+                [ -z "$input_email" ] && input_email="$DEFAULT_EMAIL"
+
+                if [ -n "$input_name" ] && [ -n "$input_email" ]; then
+                    git config --global user.name "$input_name"
+                    git config --global user.email "$input_email"
+                    echo -e "${GREEN}[Success] Git identity: ${input_name} <${input_email}>${NC}"
+                else
+                    echo -e "${YELLOW}[Skip] Git identity not configured (empty input).${NC}"
+                fi
             fi
         fi
     else
