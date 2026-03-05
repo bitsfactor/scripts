@@ -7,20 +7,17 @@
 #
 # Usage:
 #   bash one.sh
-#   curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/one.sh | bash
+#   BFS_VER=1.3.0; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh | BFS_VER=$BFS_VER bash
 # =============================================================================
 
 set -e
 
-# Version — synced from version.sh during release
-VERSION="1.3.0"
-
-# Load local version.sh override (for development)
+# Load version: BFS_VER env var (remote) > local version.sh (development)
 _SCRIPT_DIR=""
 [ -n "${BASH_SOURCE[0]}" ] && _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd 2>/dev/null)"
 [ -n "$_SCRIPT_DIR" ] && [ -f "$_SCRIPT_DIR/version.sh" ] && . "$_SCRIPT_DIR/version.sh"
+[ -n "$BFS_VER" ] && VERSION="$BFS_VER"
 
-# CDN base URL — pinned to version tag (immutable, no purge needed)
 : "${CDN_BASE:=https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v${VERSION}}"
 
 # Color definitions

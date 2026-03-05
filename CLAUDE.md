@@ -30,11 +30,11 @@ bash claude.sh
 bash pytools.sh
 
 # 远程执行（主要使用方式）
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/one.sh | bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/env.sh | bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/git.sh | bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/claude.sh | bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/pytools.sh | bash
+BFS_VER=1.3.0; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh | BFS_VER=$BFS_VER bash
+BFS_VER=1.3.0; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/env.sh | BFS_VER=$BFS_VER bash
+BFS_VER=1.3.0; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/git.sh | BFS_VER=$BFS_VER bash
+BFS_VER=1.3.0; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/claude.sh | BFS_VER=$BFS_VER bash
+BFS_VER=1.3.0; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/pytools.sh | BFS_VER=$BFS_VER bash
 ```
 
 ## 脚本规范
@@ -48,10 +48,10 @@ curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/pytools.sh | ba
 ## 发布流程
 
 1. 修改 `version.sh` 中的版本号
-2. 同步版本到所有脚本（macOS 用 `sed -i ''`，Linux 用 `sed -i`）：
+2. 同步版本到文档中的 `BFS_VER=` 赋值（macOS 用 `sed -i ''`，Linux 用 `sed -i`）：
    ```bash
    VER=$(sed -n 's/^VERSION="\(.*\)"/\1/p' version.sh)
-   sed -i '' "s/^VERSION=\".*\"/VERSION=\"$VER\"/" one.sh env.sh git.sh claude.sh pytools.sh
+   sed -i '' "s/BFS_VER=[0-9.]*;/BFS_VER=$VER;/g" README.md CLAUDE.md one.sh env.sh git.sh claude.sh pytools.sh
    ```
 3. 提交、打 tag、推送：
    ```bash
@@ -60,4 +60,3 @@ curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/pytools.sh | ba
    ```
 
 每个 tag 在 jsdelivr 上不可变，无需清除 CDN 缓存。
-`@latest` 入口 URL 由 jsdelivr 自动解析，约 12 小时内更新。
