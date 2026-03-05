@@ -5,7 +5,7 @@ A collection of bootstrap scripts for developers. All scripts support **macOS** 
 ## one.sh — One-Click VPS Setup
 
 ```bash
-BFS_VER=1.3.0; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh | BFS_VER=$BFS_VER bash
+BFS_VER=1.3.1; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh | BFS_VER=$BFS_VER bash
 ```
 
 One command to fully initialize a new VPS. Downloads and orchestrates `env.sh`, `git.sh`, and `claude.sh` in sequence — each step asks for confirmation before running, so you can skip anything you don't need.
@@ -19,7 +19,7 @@ One command to fully initialize a new VPS. Downloads and orchestrates `env.sh`, 
 ## env.sh — Development Environment Setup
 
 ```bash
-BFS_VER=1.3.0; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/env.sh | BFS_VER=$BFS_VER bash
+BFS_VER=1.3.1; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/env.sh | BFS_VER=$BFS_VER bash
 ```
 
 One-command setup for a complete development environment on any fresh macOS or Linux machine. Installs Homebrew, Git, Python3, Node.js, Go, and Docker — each as an independent option or all at once.
@@ -36,7 +36,7 @@ One-command setup for a complete development environment on any fresh macOS or L
 ## git.sh — SSH Key Manager
 
 ```bash
-BFS_VER=1.3.0; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/git.sh | BFS_VER=$BFS_VER bash
+BFS_VER=1.3.1; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/git.sh | BFS_VER=$BFS_VER bash
 ```
 
 The fastest way to set up GitHub SSH access across all your machines. Designed for solo developers who manage multiple VPS instances — generate a key pair once on your main computer, then share the same private key to every new server. No more repeated key generation or manual config.
@@ -47,7 +47,7 @@ The fastest way to set up GitHub SSH access across all your machines. Designed f
 ## claude.sh — Claude Code Setup
 
 ```bash
-BFS_VER=1.3.0; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/claude.sh | BFS_VER=$BFS_VER bash
+BFS_VER=1.3.1; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/claude.sh | BFS_VER=$BFS_VER bash
 ```
 
 Install / update, configure, or uninstall Claude Code.
@@ -61,7 +61,7 @@ Install / update, configure, or uninstall Claude Code.
 ## pytools.sh — Python Tools Installer
 
 ```bash
-BFS_VER=1.3.0; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/pytools.sh | BFS_VER=$BFS_VER bash
+BFS_VER=1.3.1; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/pytools.sh | BFS_VER=$BFS_VER bash
 ```
 
 One-click deploy Python command-line tools to `~/pytools`. Downloads each tool from CDN, installs Python dependencies, and adds `~/pytools` to `PATH` — so every tool is callable by name from anywhere in the terminal.
