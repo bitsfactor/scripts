@@ -6,6 +6,8 @@ A collection of bootstrap scripts for developers. All scripts support **macOS** 
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/one.sh | bash
+# non-cached
+curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/one.sh | bash
 ```
 
 One command to fully initialize a new VPS. Downloads and orchestrates `env.sh`, `git.sh`, and `claude.sh` in sequence — each step asks for confirmation before running, so you can skip anything you don't need.
@@ -20,22 +22,27 @@ One command to fully initialize a new VPS. Downloads and orchestrates `env.sh`, 
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/env.sh | bash
+# non-cached
+curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/env.sh | bash
 ```
 
-One-command setup for a complete development environment on any fresh macOS or Linux machine. Installs Homebrew, Git, Python3, Node.js, and Go — each as an independent option or all at once.
+One-command setup for a complete development environment on any fresh macOS or Linux machine. Installs Homebrew, Git, Python3, Node.js, Go, and Docker — each as an independent option or all at once.
 
-- **1) Install All** — Runs every step below in sequence: Homebrew (macOS) → Git → Python3 → Node.js → Go. Safe to re-run; already-installed tools are skipped.
+- **1) Install All** — Runs every step below in sequence: Homebrew (macOS) → Git → Python3 → Node.js → Go → Docker → SSH Port (Linux). Safe to re-run; already-installed tools are skipped.
 - **2) Install Homebrew** — macOS only. Installs Homebrew if not present. Skipped silently on Linux.
 - **3) Install Git** — Installs Git via Homebrew (macOS) or `apt-get` (Linux).
 - **4) Install Python3** — Installs Python3 + pip + venv via Homebrew (macOS) or `apt-get` (Linux).
 - **5) Install Node.js & npm** — Installs Node via Homebrew (macOS) or nvm LTS (Linux). Writes nvm init block to shell config.
 - **6) Install Go** — Installs Go via Homebrew (macOS) or downloads the official SDK to `~/.go_sdk` (Linux, no sudo required). Writes `GOROOT`/`PATH` to shell config.
-- **7) Install / Update OOSP** — Fetch OOSP spec from CDN and append to `~/.claude/CLAUDE.md` or project-level `CLAUDE.md`. Supports Chinese and English.
+- **7) Install Docker** — Installs Docker via Homebrew cask (macOS) or official convenience script (Linux). Adds current user to docker group on Linux.
+- **8) Change SSH Port** — Linux only. Changes the SSH listening port in `sshd_config` and restarts sshd.
 
 ## git.sh — SSH Key Manager
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/git.sh | bash
+# non-cached
+curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/git.sh | bash
 ```
 
 The fastest way to set up GitHub SSH access across all your machines. Designed for solo developers who manage multiple VPS instances — generate a key pair once on your main computer, then share the same private key to every new server. No more repeated key generation or manual config.
@@ -47,6 +54,8 @@ The fastest way to set up GitHub SSH access across all your machines. Designed f
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/claude.sh | bash
+# non-cached
+curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/claude.sh | bash
 ```
 
 Install / update, configure, or uninstall Claude Code.
@@ -54,12 +63,15 @@ Install / update, configure, or uninstall Claude Code.
 - **1) Install / Update** — Install Claude Code, or update it if already installed. Automatically detects the install method (npm, Homebrew, official installer) and runs the matching upgrade command.
 - **2) Set API** — Enter your API endpoint and key. The script saves them and cleans up any old config automatically.
 - **3) Trust All Tools** — Skip all permission prompts.
-- **4) Uninstall** — Remove Claude Code and all its config files. You can also choose to only clear config while keeping the program.
+- **4) Install / Update oosp** — Fetch oosp spec from CDN and append to `~/.claude/CLAUDE.md` or project-level `CLAUDE.md`. Supports Chinese and English.
+- **5) Uninstall** — Remove Claude Code and all its config files. You can also choose to only clear config while keeping the program.
 
 ## pytools.sh — Python Tools Installer
 
 ```bash
 curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/pytools.sh | bash
+# non-cached
+curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/pytools.sh | bash
 ```
 
 One-click deploy Python command-line tools to `~/pytools`. Downloads each tool from CDN, installs Python dependencies, and adds `~/pytools` to `PATH` — so every tool is callable by name from anywhere in the terminal.
