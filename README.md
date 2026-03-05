@@ -2,18 +2,6 @@
 
 A collection of bootstrap scripts for developers. All scripts support **macOS** and **Linux**, and run independently via `curl | bash`. All scripts share a single version number defined in `version.sh`.
 
-## Quick Start
-
-**jsDelivr CDN**:
-```bash
-curl -s https://fastly.jsdelivr.net/gh/bitsfactor/scripts@latest/<script> | bash
-```
-
-**GitHub Raw** (always latest):
-```bash
-curl -s https://raw.githubusercontent.com/bitsfactor/scripts/main/<script> | bash
-```
-
 ## one.sh — One-Click VPS Setup
 
 ```bash
