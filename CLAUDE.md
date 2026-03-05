@@ -43,13 +43,12 @@ BFS_VER=<ver>; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BF
 
 ## 发布流程
 
-1. 修改 `version.sh` 中的版本号
-2. 同步版本到文档中的 `BFS_VER=` 赋值（macOS 用 `sed -i ''`，Linux 用 `sed -i`）：
-   ```bash
-   VER=$(sed -n 's/^VERSION="\(.*\)"/\1/p' version.sh)
-   sed -i '' "s/BFS_VER=[0-9.]*;/BFS_VER=$VER;/g" README.md
-   ```
-3. 提交、打 tag、推送：
+当用户说"发布"时，执行以下步骤：
+
+1. 从 `version.sh` 读取当前版本号
+2. patch 版本 +1（如 1.3.1 → 1.3.2），写回 `version.sh`
+3. 同步新版本号到 `README.md`（`sed` 替换所有 `BFS_VER=x.y.z;`）
+4. 提交、打 tag、推送：
    ```bash
    git add -A && git commit -m "chore: bump version to $VER"
    git tag "v$VER" && git push && git push --tags
