@@ -124,7 +124,7 @@ do_set_key() {
     echo -e "\n${BLUE}=== Set SSH Key ===${NC}\n"
 
     # Prepare SSH directory
-    echo -e "${BLUE}[Step 1/4] Preparing SSH directory...${NC}"
+    echo -e "${BLUE}[Step 1/5] Preparing SSH directory...${NC}"
     ensure_ssh_dir
 
     # Receive the Private Key
@@ -180,13 +180,13 @@ do_set_key() {
     fi
 
     # Move to final location with strict permissions
-    echo -e "\n${BLUE}[Step 2/4] Applying strict permissions (600)...${NC}"
+    echo -e "\n${BLUE}[Step 2/5] Applying strict permissions (600)...${NC}"
     mv "$TMP_KEY" "$KEY_FILE"
     trap - EXIT INT TERM
     chmod 600 "$KEY_FILE"
 
     # Generate matching public key from private key
-    echo -e "${BLUE}[Step 3/4] Generating matching public key...${NC}"
+    echo -e "${BLUE}[Step 3/5] Generating matching public key...${NC}"
     if ! ssh-keygen -y -f "$KEY_FILE" > "${KEY_FILE}.pub" 2>/dev/null; then
         echo -e "${RED}[Error] Invalid private key. Please check the key content and try again.${NC}"
         rm -f "${KEY_FILE}.pub" "$KEY_FILE"
@@ -195,7 +195,7 @@ do_set_key() {
     chmod 644 "${KEY_FILE}.pub"
 
     # Add GitHub to known_hosts
-    echo -e "${BLUE}[Step 4/4] Adding GitHub to trusted hosts...${NC}"
+    echo -e "${BLUE}[Step 4/5] Adding GitHub to trusted hosts...${NC}"
     if ! ssh-keygen -F github.com -f ~/.ssh/known_hosts > /dev/null 2>&1; then
         if ! ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null; then
             echo -e "  ${YELLOW}[Warning] Could not fetch GitHub host key. Verification may fail.${NC}"
@@ -211,6 +211,39 @@ do_set_key() {
     if [[ "$SSH_OUTPUT" == *"successfully authenticated"* ]]; then
         echo -e "${GREEN}[Success] GitHub authentication is configured perfectly!${NC}"
         echo -e "${GREEN}You can now securely 'git clone' your private repositories.${NC}"
+
+        # Configure Git identity
+        echo -e "\n${BLUE}[Step 5/5] Configuring Git identity...${NC}"
+        local CURRENT_NAME CURRENT_EMAIL
+        CURRENT_NAME=$(git config --global user.name 2>/dev/null || true)
+        CURRENT_EMAIL=$(git config --global user.email 2>/dev/null || true)
+
+        if [ -n "$CURRENT_NAME" ] && [ -n "$CURRENT_EMAIL" ]; then
+            echo -e "${GREEN}[Skip] Git identity already configured: ${CURRENT_NAME} <${CURRENT_EMAIL}>${NC}"
+        else
+            # Extract GitHub username from SSH output: "Hi username! ..."
+            local GH_USER=""
+            GH_USER=$(echo "$SSH_OUTPUT" | sed -n 's/.*Hi \([^!]*\)!.*/\1/p')
+
+            local DEFAULT_NAME="${CURRENT_NAME:-${GH_USER:-}}"
+            local DEFAULT_EMAIL="${CURRENT_EMAIL:-${GH_USER:+${GH_USER}@users.noreply.github.com}}"
+
+            echo -e "${YELLOW}Git user.name and user.email are not configured.${NC}"
+            local input_name input_email
+            tty_read input_name "  Git user.name [${DEFAULT_NAME}]: "
+            [ -z "$input_name" ] && input_name="$DEFAULT_NAME"
+
+            tty_read input_email "  Git user.email [${DEFAULT_EMAIL}]: "
+            [ -z "$input_email" ] && input_email="$DEFAULT_EMAIL"
+
+            if [ -n "$input_name" ] && [ -n "$input_email" ]; then
+                git config --global user.name "$input_name"
+                git config --global user.email "$input_email"
+                echo -e "${GREEN}[Success] Git identity: ${input_name} <${input_email}>${NC}"
+            else
+                echo -e "${YELLOW}[Skip] Git identity not configured (empty input).${NC}"
+            fi
+        fi
     else
         echo -e "${RED}[Warning] GitHub verification failed. SSH response:${NC}"
         echo -e "${YELLOW}${SSH_OUTPUT}${NC}"
