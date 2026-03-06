@@ -52,7 +52,7 @@ esac
 
 CDN_PYTOOLS="${CDN_BASE}/pytools"
 PYTOOLS_DIR="$HOME/pytools"
-PYTOOLS_FILES=("dogecloud.py")
+PYTOOLS_FILES=("dogecloud.py" "xsync-sqlite.py")
 PYTOOLS_DEPS=("requests" "boto3")
 VENV_DIR="$PYTOOLS_DIR/.venv"
 PYTOOLS_BLOCK_START="# >>> BitsFactor pytools PATH"
