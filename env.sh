@@ -62,6 +62,9 @@ NVM_BLOCK_END="# <<< BitsFactor nvm init"
 GO_BLOCK_START="# >>> BitsFactor go SDK PATH"
 GO_BLOCK_END="# <<< BitsFactor go SDK PATH"
 
+BREW_BLOCK_START="# >>> BitsFactor brew shellenv"
+BREW_BLOCK_END="# <<< BitsFactor brew shellenv"
+
 # ---- Shared functions ----
 
 # has_path_block: check if a PATH block marker already exists in any shell config
@@ -122,8 +125,30 @@ do_install_brew() {
         return 0
     fi
 
+    # Ensure Xcode Command Line Tools are installed (Homebrew dependency).
+    # In pipe / SSH mode the macOS GUI installer dialog cannot be interacted
+    # with, so we trigger `xcode-select --install` beforehand and wait.
+    if ! xcode-select -p &>/dev/null; then
+        echo -e "${BLUE}Installing Xcode Command Line Tools (required by Homebrew)...${NC}"
+        xcode-select --install 2>/dev/null || true
+        # Wait up to 10 minutes for the CLT installation to finish
+        local waited=0
+        while ! xcode-select -p &>/dev/null; do
+            if [ "$waited" -ge 600 ]; then
+                echo -e "${RED}[Error] Timed out waiting for Xcode CLT installation.${NC}"
+                echo -e "${YELLOW}Please install manually: xcode-select --install${NC}"
+                return 1
+            fi
+            sleep 5
+            waited=$((waited + 5))
+        done
+        echo -e "${GREEN}[Success] Xcode Command Line Tools installed.${NC}"
+    fi
+
     echo -e "${BLUE}Installing Homebrew from official installer...${NC}"
-    /bin/bash -c "$(curl -fsSL https://fastly.jsdelivr.net/gh/Homebrew/install@master/install.sh)"
+    # NONINTERACTIVE=1: skip the "Press RETURN" confirmation prompt,
+    # which hangs in curl|bash pipe mode where stdin is unavailable.
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || return 1
 
     # Activate brew in current session.
     # Use [ -x ] to check binary existence before eval to avoid spurious
@@ -136,6 +161,11 @@ do_install_brew() {
 
     if command -v brew &> /dev/null; then
         echo -e "${GREEN}[Success] Homebrew installed: $(brew --version | head -1)${NC}"
+
+        # Persist brew shellenv to shell RC so brew is available in new terminals
+        local brew_content
+        brew_content="eval \"\$($(command -v brew) shellenv)\""
+        write_path_block "$BREW_BLOCK_START" "$BREW_BLOCK_END" "$brew_content"
     else
         echo -e "${RED}[Error] Homebrew installation may have failed. Please restart terminal and try again.${NC}"
         return 1
