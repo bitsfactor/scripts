@@ -30,11 +30,11 @@ NC='\033[0m'
 # ---- OS detection ----
 
 OS_TYPE=""
-case "$OSTYPE" in
-    darwin*)  OS_TYPE="macos" ;;
-    linux*)   OS_TYPE="linux" ;;
+case "$(uname -s)" in
+    Darwin*)  OS_TYPE="macos" ;;
+    Linux*)   OS_TYPE="linux" ;;
     *)
-        echo -e "${RED}[Error] Unsupported OS: $OSTYPE${NC}"
+        echo -e "${RED}[Error] Unsupported OS: $(uname -s)${NC}"
         echo -e "${YELLOW}This script only supports macOS and Linux.${NC}"
         exit 1
         ;;
@@ -45,7 +45,13 @@ esac
 USER_SHELL="$(basename "${SHELL:-/bin/bash}")"
 case "$USER_SHELL" in
     zsh)  SHELL_RC="$HOME/.zshrc" ;;
-    *)    SHELL_RC="$HOME/.bashrc" ;;
+    *)
+        if [ "$OS_TYPE" = "macos" ]; then
+            SHELL_RC="$HOME/.bash_profile"
+        else
+            SHELL_RC="$HOME/.bashrc"
+        fi
+        ;;
 esac
 
 # ---- Constants ----
