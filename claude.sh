@@ -461,6 +461,12 @@ do_set_api() {
         return 1
     fi
 
+    # Auto-prepend https:// if no protocol specified
+    if [[ "$INPUT_URL" != [hH][tT][tT][pP]://* ]] && [[ "$INPUT_URL" != [hH][tT][tT][pP][sS]://* ]]; then
+        INPUT_URL="https://${INPUT_URL}"
+        echo -e "${YELLOW}[Auto] Added https:// prefix → ${INPUT_URL}${NC}"
+    fi
+
     echo -e "${CYAN}Enter ANTHROPIC_AUTH_TOKEN (API key):${NC}"
     tty_read INPUT_TOKEN
 
