@@ -19,6 +19,9 @@ xsync-sqlite — SQLite 同步工具
     # 手动同步
     python3 xsync-sqlite.py --sync
 
+    # 启动 pull 定时循环（供 systemd 调用）
+    python3 xsync-sqlite.py --pull-daemon
+
     # 重置配置
     python3 xsync-sqlite.py --reset-config
 """
@@ -26,6 +29,7 @@ xsync-sqlite — SQLite 同步工具
 import os
 import sys
 import json
+import time
 import shutil
 import sqlite3
 import platform
@@ -54,6 +58,7 @@ class xsync_config:
         r2_path_prefix    路径前缀（可选）
         db_path           数据库文件绝对路径
         mode              同步模式（push / pull）
+        sync_interval     同步间隔秒数（默认 3600）
     """
 
     _config_path = Path(__file__).parent / "xsync-sqlite-config.json"
@@ -175,6 +180,7 @@ class xsync_litestream:
         access_key = cfg["r2_access_key"]
         secret_key = cfg["r2_secret_key"]
         prefix = cfg.get("r2_path_prefix", "")
+        interval = cfg.get("sync_interval", 3600)
 
         # 构建 replica path
         db_filename = Path(db_path).name
@@ -192,7 +198,7 @@ class xsync_litestream:
                     access-key-id: "{access_key}"
                     secret-access-key: "{secret_key}"
                     force-path-style: true
-                    sync-interval: 10s
+                    sync-interval: {interval}s
         """)
 
         self.yml_path.parent.mkdir(parents=True, exist_ok=True)
@@ -226,13 +232,25 @@ class xsync_litestream:
         )
         return ret.returncode == 0
 
+    def restore_loop(self, db_path, interval=3600):
+        """定时循环从 R2 恢复数据库。"""
+        print(f"  启动定时 pull（间隔 {interval} 秒）...")
+        try:
+            while True:
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                print(f"  [{timestamp}] 正在 pull...")
+                self.restore(db_path)
+                time.sleep(interval)
+        except KeyboardInterrupt:
+            print("\n  定时 pull 已停止。")
+
 
 # ============================================================
 # xsync_service — systemd 服务管理（仅 Linux）
 # ============================================================
 class xsync_service:
     """
-    systemd 服务管理（仅 Linux push 模式）。
+    systemd 服务管理（仅 Linux）。
 
     服务名：xsync-sqlite
     路径：/etc/systemd/system/xsync-sqlite.service
@@ -241,22 +259,28 @@ class xsync_service:
     _service_name = "xsync-sqlite"
     _service_path = Path("/etc/systemd/system/xsync-sqlite.service")
 
-    def create(self, yml_path):
+    def create(self, yml_path, mode="push", script_path=None):
         """创建 systemd 服务文件并启动。"""
-        litestream_path = shutil.which("litestream")
-        if not litestream_path:
-            print("  [错误] 未找到 litestream 可执行文件。")
-            return False
+        if mode == "push":
+            litestream_path = shutil.which("litestream")
+            if not litestream_path:
+                print("  [错误] 未找到 litestream 可执行文件。")
+                return False
+            exec_start = f"{litestream_path} replicate -config {yml_path}"
+            description = "xsync-sqlite Litestream Replication"
+        else:  # pull
+            exec_start = f"python3 {script_path} --pull-daemon"
+            description = "xsync-sqlite Pull Daemon"
 
         unit_content = textwrap.dedent(f"""\
             [Unit]
-            Description=xsync-sqlite Litestream Replication
+            Description={description}
             After=network.target
 
             [Service]
             Type=simple
             User={getuser()}
-            ExecStart={litestream_path} replicate -config {yml_path}
+            ExecStart={exec_start}
             Restart=on-failure
             RestartSec=5s
 
@@ -330,6 +354,10 @@ class xsync_tool:
             "--sync", action="store_true",
             help="直接执行手动同步",
         )
+        parser.add_argument(
+            "--pull-daemon", action="store_true",
+            help="启动 pull 定时循环（内部用，供 systemd 调用）",
+        )
         self._args = parser.parse_args()
         self._cfg_mgr = xsync_config()
         self._ls = xsync_litestream()
@@ -348,6 +376,9 @@ class xsync_tool:
             return
         if self._args.sync:
             self._do_sync()
+            return
+        if self._args.pull_daemon:
+            self._do_pull_daemon()
             return
 
         self._menu()
@@ -378,11 +409,11 @@ class xsync_tool:
     # ---- 安装流水线 ----
 
     def _do_install(self, reset=False):
-        """6 步安装流水线。"""
+        """7 步安装流水线。"""
         print("\n=== 安装配置 ===\n")
 
-        # Step 1/6: 检查 Litestream
-        print("[Step 1/6] 检查 Litestream...")
+        # Step 1/7: 检查 Litestream
+        print("[Step 1/7] 检查 Litestream...")
         if xsync_litestream.is_installed():
             version = xsync_litestream.get_version()
             print(f"  ✓ Litestream 已安装（{version}）")
@@ -393,8 +424,8 @@ class xsync_tool:
                 sys.exit(1)
             print("  ✓ Litestream 安装成功")
 
-        # Step 2/6: 配置 Cloudflare R2
-        print("\n[Step 2/6] 配置 Cloudflare R2...")
+        # Step 2/7: 配置 Cloudflare R2
+        print("\n[Step 2/7] 配置 Cloudflare R2...")
         existing = None if reset else self._cfg_mgr.load()
         if existing:
             print(f"  已有配置（Bucket: {existing.get('r2_bucket', 'N/A')}）")
@@ -412,24 +443,29 @@ class xsync_tool:
         else:
             r2_cfg = self._prompt_r2()
 
-        # Step 3/6: 指定数据库文件路径
-        print("\n[Step 3/6] 指定数据库文件路径...")
+        # Step 3/7: 指定数据库文件路径
+        print("\n[Step 3/7] 指定数据库文件路径...")
         db_path = self._prompt_db_path()
 
-        # Step 4/6: 选择同步模式（先选模式，再检查 WAL）
-        print("\n[Step 4/6] 选择同步模式...")
+        # Step 4/7: 选择同步模式（先选模式，再检查 WAL）
+        print("\n[Step 4/7] 选择同步模式...")
         mode = self._prompt_mode()
 
-        # Step 5/6: 检查 WAL 模式
-        print("\n[Step 5/6] 检查 WAL 模式...")
+        # Step 5/7: 设置同步间隔
+        print("\n[Step 5/7] 设置同步间隔...")
+        sync_interval = self._prompt_sync_interval()
+
+        # Step 6/7: 检查 WAL 模式
+        print("\n[Step 6/7] 检查 WAL 模式...")
         self._check_wal(db_path, mode)
 
-        # Step 6/6: 生成配置 & 启动服务
-        print("\n[Step 6/6] 生成配置 & 启动服务...")
+        # Step 7/7: 生成配置 & 启动服务
+        print("\n[Step 7/7] 生成配置 & 启动服务...")
         cfg = {
             **r2_cfg,
             "db_path": db_path,
             "mode": mode,
+            "sync_interval": sync_interval,
         }
 
         # 生成 litestream.yml
@@ -442,11 +478,12 @@ class xsync_tool:
 
         # 根据模式和平台执行
         system = platform.system()
+        script_path = str(Path(__file__).resolve())
 
         if mode == "push":
             if system == "Linux":
                 print("  正在创建 systemd 服务...")
-                if self._svc.create(yml_path):
+                if self._svc.create(yml_path, mode="push"):
                     print("  ✓ systemd 服务已创建并启动（xsync-sqlite）")
                 else:
                     print("  [错误] 服务创建失败，可手动执行：")
@@ -462,6 +499,13 @@ class xsync_tool:
                 print(f"  ✓ 数据库已恢复到 {db_path}")
             else:
                 print("  [错误] 恢复失败。")
+            if system == "Linux":
+                print("  正在创建 systemd 定时 pull 服务...")
+                if self._svc.create(yml_path, mode="pull", script_path=script_path):
+                    print("  ✓ systemd 服务已创建并启动（xsync-sqlite）")
+                else:
+                    print("  [错误] 服务创建失败，可手动执行：")
+                    print(f"    python3 {script_path} --pull-daemon")
 
         print("\n[完成] 安装配置结束。")
 
@@ -512,6 +556,22 @@ class xsync_tool:
                 return mode
             print("  请输入 push 或 pull。")
 
+    def _prompt_sync_interval(self):
+        """交互式输入同步间隔秒数。"""
+        raw = input("  同步间隔（秒，默认 3600）: ").strip()
+        if not raw:
+            print("  使用默认值 3600 秒")
+            return 3600
+        try:
+            val = int(raw)
+            if val <= 0:
+                print("  [警告] 间隔必须大于 0，使用默认值 3600 秒")
+                return 3600
+            return val
+        except ValueError:
+            print("  [警告] 输入无效，使用默认值 3600 秒")
+            return 3600
+
     def _check_wal(self, db_path, mode):
         """检查并可选切换 WAL 模式。"""
         if mode == "pull" or not os.path.exists(db_path):
@@ -552,6 +612,7 @@ class xsync_tool:
         # 配置摘要
         print(f"  数据库路径：{cfg.get('db_path', 'N/A')}")
         print(f"  同步模式：  {cfg.get('mode', 'N/A')}")
+        print(f"  同步间隔：  {cfg.get('sync_interval', 3600)} 秒")
         print(f"  R2 Bucket： {cfg.get('r2_bucket', 'N/A')}")
         prefix = cfg.get("r2_path_prefix", "")
         if prefix:
@@ -603,8 +664,29 @@ class xsync_tool:
         else:
             if self._ls.restore(db_path):
                 print(f"\n  ✓ 数据库已恢复到 {db_path}")
+                if platform.system() == "Linux":
+                    script_path = str(Path(__file__).resolve())
+                    print("  提示：可通过 systemd 服务实现定时拉取：")
+                    print(f"    python3 {script_path} --install")
             else:
                 print("\n  [错误] 恢复失败。")
+
+    # ---- pull 守护模式 ----
+
+    def _do_pull_daemon(self):
+        """pull 定时循环，供 systemd 服务调用。"""
+        cfg = self._cfg_mgr.load()
+        if not cfg:
+            print("未找到配置，请先执行安装配置。")
+            sys.exit(1)
+
+        if not self._ls.yml_path.exists():
+            print("未找到 litestream.yml，请先执行安装配置。")
+            sys.exit(1)
+
+        db_path = cfg.get("db_path", "")
+        interval = cfg.get("sync_interval", 3600)
+        self._ls.restore_loop(db_path, interval)
 
 
 # ============================================================
