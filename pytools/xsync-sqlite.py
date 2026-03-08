@@ -223,6 +223,7 @@ class xsync_litestream:
             bak = target.with_suffix(target.suffix + ".bak")
             print(f"  数据库已存在，备份为 {bak.name}...")
             shutil.copy2(str(target), str(bak))
+            target.unlink()
 
         print("  正在从 R2 恢复数据库...")
         ret = subprocess.run(
