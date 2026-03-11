@@ -19,6 +19,9 @@ xsync-sqlite — SQLite 同步工具
     # 手动同步
     python3 xsync-sqlite.py --sync
 
+    # 切换同步模式（push ↔ pull）
+    python3 xsync-sqlite.py --switch-mode
+
     # 启动 pull 定时循环（供 systemd 调用）
     python3 xsync-sqlite.py --pull-daemon
 
@@ -380,6 +383,10 @@ class xsync_tool:
             "--pull-daemon", action="store_true",
             help="启动 pull 定时循环（内部用，供 systemd 调用）",
         )
+        parser.add_argument(
+            "--switch-mode", action="store_true",
+            help="切换同步模式（push ↔ pull）",
+        )
         self._args = parser.parse_args()
         self._cfg_mgr = xsync_config()
         self._ls = xsync_litestream()
@@ -402,6 +409,9 @@ class xsync_tool:
         if self._args.pull_daemon:
             self._do_pull_daemon()
             return
+        if self._args.switch_mode:
+            self._do_switch_mode()
+            return
 
         self._menu()
 
@@ -412,16 +422,19 @@ class xsync_tool:
         print("  1) 安装配置")
         print("  2) 查看服务状态")
         print("  3) 手动同步")
+        print("  4) 切换同步模式")
         print("  0) 退出")
         print()
 
-        choice = input("请输入选项 (0/1/2/3): ").strip()
+        choice = input("请输入选项 (0/1/2/3/4): ").strip()
         if choice == "1":
             self._do_install()
         elif choice == "2":
             self._do_status()
         elif choice == "3":
             self._do_sync()
+        elif choice == "4":
+            self._do_switch_mode()
         elif choice in ("0", ""):
             print("已退出。")
         else:
@@ -625,6 +638,98 @@ class xsync_tool:
         finally:
             if conn:
                 conn.close()
+
+    # ---- 切换模式 ----
+
+    def _do_switch_mode(self):
+        """切换同步模式（push ↔ pull）。"""
+        print("\n=== 切换同步模式 ===\n")
+
+        cfg = self._cfg_mgr.load()
+        if not cfg:
+            print("未找到配置，请先执行安装配置。")
+            sys.exit(1)
+
+        old_mode = cfg.get("mode", "push")
+        new_mode = "pull" if old_mode == "push" else "push"
+        db_path = cfg.get("db_path", "")
+        bucket = cfg.get("r2_bucket", "N/A")
+
+        if not db_path:
+            print("[错误] 配置中缺少数据库路径，请重新执行安装配置。")
+            sys.exit(1)
+
+        print(f"  数据库路径：{db_path}")
+        print(f"  R2 Bucket： {bucket}")
+        print(f"  当前模式：  {old_mode} → {new_mode}")
+        if new_mode == "push":
+            print(f"  同步策略：  WAL 增量 10 秒，完整快照 6 小时")
+        else:
+            pull_interval = cfg.get("pull_interval") or cfg.get("sync_interval", 3600)
+            print(f"  pull 间隔： {pull_interval} 秒")
+        print()
+
+        confirm = input("确认切换？(y/N): ").strip().lower()
+        if confirm not in ("y", "yes"):
+            print("已取消。")
+            return
+
+        # 切换到 push 时检查 WAL
+        if new_mode == "push":
+            print("\n检查 WAL 模式...")
+            self._check_wal(db_path, new_mode)
+
+        # 切换到 pull 时，如果没有 pull_interval 则询问
+        if new_mode == "pull" and not cfg.get("pull_interval"):
+            print()
+            pull_interval = self._prompt_interval("pull 间隔", default=3600)
+            cfg["pull_interval"] = pull_interval
+
+        # 更新配置
+        cfg["mode"] = new_mode
+        self._cfg_mgr.save(cfg)
+        print(f"\n  ✓ 配置已更新为 {new_mode} 模式")
+
+        # 重新生成 litestream.yml
+        yml_path = self._ls.generate_yml(cfg)
+        print(f"  ✓ 配置文件已重新生成：{yml_path}")
+
+        # Linux: 停止旧服务、创建新服务
+        system = platform.system()
+        script_path = str(Path(__file__).resolve())
+
+        if system == "Linux":
+            sudo = [] if os.geteuid() == 0 else ["sudo"]
+            print("\n  正在停止旧服务...")
+            subprocess.run(
+                [*sudo, "systemctl", "stop", "xsync-sqlite"],
+                capture_output=True,
+            )
+
+            # 切换到 pull 时先恢复一次
+            if new_mode == "pull":
+                print("  正在从 R2 恢复数据库...")
+                if self._ls.restore(db_path):
+                    print(f"  ✓ 数据库已恢复到 {db_path}")
+                else:
+                    print("  [警告] 恢复失败，服务启动后将自动重试。")
+
+            print("  正在创建新服务...")
+            if self._svc.create(yml_path, mode=new_mode, script_path=script_path):
+                print(f"  ✓ systemd 服务已重建并启动（{new_mode} 模式）")
+            else:
+                print("  [错误] 服务创建失败。")
+        else:
+            # macOS: 切换到 pull 时先恢复一次
+            if new_mode == "pull":
+                print("\n  正在从 R2 恢复数据库...")
+                if self._ls.restore(db_path):
+                    print(f"  ✓ 数据库已恢复到 {db_path}")
+                else:
+                    print("  [错误] 恢复失败。")
+            print("  macOS 不支持 systemd，请手动管理同步。")
+
+        print(f"\n[完成] 已切换到 {new_mode} 模式。")
 
     # ---- 查看状态 ----
 
