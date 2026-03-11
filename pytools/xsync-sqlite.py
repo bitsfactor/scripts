@@ -58,7 +58,7 @@ class xsync_config:
         r2_path_prefix    路径前缀（可选）
         db_path           数据库文件绝对路径
         mode              同步模式（push / pull）
-        sync_interval     同步间隔秒数（默认 3600）
+        pull_interval     pull 间隔秒数（仅 pull 模式，默认 3600）
     """
 
     _config_path = Path(__file__).parent / "xsync-sqlite-config.json"
@@ -180,26 +180,47 @@ class xsync_litestream:
         access_key = cfg["r2_access_key"]
         secret_key = cfg["r2_secret_key"]
         prefix = cfg.get("r2_path_prefix", "")
-        interval = cfg.get("sync_interval", 3600)
+
+        # push 模式使用优化的固定间隔，pull 模式只需要基本配置（用于 restore）
+        mode = cfg.get("mode", "push")
 
         # 构建 replica path
         db_filename = Path(db_path).name
         replica_path = f"{prefix}/{db_filename}" if prefix else db_filename
 
-        yml_content = textwrap.dedent(f"""\
-            dbs:
-              - path: "{db_path}"
-                replicas:
-                  - type: s3
-                    bucket: "{bucket}"
-                    path: "{replica_path}"
-                    endpoint: "{endpoint}"
-                    region: auto
-                    access-key-id: "{access_key}"
-                    secret-access-key: "{secret_key}"
-                    force-path-style: true
-                    sync-interval: {interval}s
-        """)
+        # 根据模式生成不同的配置
+        if mode == "push":
+            yml_content = textwrap.dedent(f"""\
+                dbs:
+                  - path: "{db_path}"
+                    replicas:
+                      - type: s3
+                        bucket: "{bucket}"
+                        path: "{replica_path}"
+                        endpoint: "{endpoint}"
+                        region: auto
+                        access-key-id: "{access_key}"
+                        secret-access-key: "{secret_key}"
+                        force-path-style: true
+                        sync-interval: 10s
+                        snapshot-interval: 6h
+                        validation-interval: 24h
+            """)
+        else:
+            # pull 模式不需要同步配置，只用于 restore 命令
+            yml_content = textwrap.dedent(f"""\
+                dbs:
+                  - path: "{db_path}"
+                    replicas:
+                      - type: s3
+                        bucket: "{bucket}"
+                        path: "{replica_path}"
+                        endpoint: "{endpoint}"
+                        region: auto
+                        access-key-id: "{access_key}"
+                        secret-access-key: "{secret_key}"
+                        force-path-style: true
+            """)
 
         self.yml_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.yml_path, "w", encoding="utf-8") as f:
@@ -452,9 +473,14 @@ class xsync_tool:
         print("\n[Step 4/7] 选择同步模式...")
         mode = self._prompt_mode()
 
-        # Step 5/7: 设置同步间隔
-        print("\n[Step 5/7] 设置同步间隔...")
-        sync_interval = self._prompt_sync_interval()
+        # Step 5/7: 设置同步间隔（仅 pull 模式）
+        if mode == "pull":
+            print("\n[Step 5/7] 设置 pull 间隔...")
+            pull_interval = self._prompt_interval("pull 间隔", default=3600)
+        else:
+            print("\n[Step 5/7] 配置同步策略...")
+            print("  push 模式使用优化策略：WAL 增量 10 秒，完整快照 6 小时")
+            pull_interval = None
 
         # Step 6/7: 检查 WAL 模式
         print("\n[Step 6/7] 检查 WAL 模式...")
@@ -466,8 +492,9 @@ class xsync_tool:
             **r2_cfg,
             "db_path": db_path,
             "mode": mode,
-            "sync_interval": sync_interval,
         }
+        if pull_interval is not None:
+            cfg["pull_interval"] = pull_interval
 
         # 生成 litestream.yml
         yml_path = self._ls.generate_yml(cfg)
@@ -557,21 +584,21 @@ class xsync_tool:
                 return mode
             print("  请输入 push 或 pull。")
 
-    def _prompt_sync_interval(self):
-        """交互式输入同步间隔秒数。"""
-        raw = input("  同步间隔（秒，默认 3600）: ").strip()
+    def _prompt_interval(self, prompt_text, default=3600):
+        """交互式输入间隔秒数（通用方法）。"""
+        raw = input(f"  {prompt_text}（秒，默认 {default}）: ").strip()
         if not raw:
-            print("  使用默认值 3600 秒")
-            return 3600
+            print(f"  使用默认值 {default} 秒")
+            return default
         try:
             val = int(raw)
             if val <= 0:
-                print("  [警告] 间隔必须大于 0，使用默认值 3600 秒")
-                return 3600
+                print(f"  [警告] 间隔必须大于 0，使用默认值 {default} 秒")
+                return default
             return val
         except ValueError:
-            print("  [警告] 输入无效，使用默认值 3600 秒")
-            return 3600
+            print(f"  [警告] 输入无效，使用默认值 {default} 秒")
+            return default
 
     def _check_wal(self, db_path, mode):
         """检查并可选切换 WAL 模式。"""
@@ -612,8 +639,14 @@ class xsync_tool:
 
         # 配置摘要
         print(f"  数据库路径：{cfg.get('db_path', 'N/A')}")
-        print(f"  同步模式：  {cfg.get('mode', 'N/A')}")
-        print(f"  同步间隔：  {cfg.get('sync_interval', 3600)} 秒")
+        mode = cfg.get('mode', 'N/A')
+        print(f"  同步模式：  {mode}")
+        if mode == "push":
+            print(f"  同步策略：  WAL 增量 10 秒，完整快照 6 小时")
+        elif mode == "pull":
+            # 向后兼容：优先使用 pull_interval，如果不存在则使用旧的 sync_interval
+            pull_interval = cfg.get('pull_interval') or cfg.get('sync_interval', 3600)
+            print(f"  pull 间隔： {pull_interval} 秒")
         print(f"  R2 Bucket： {cfg.get('r2_bucket', 'N/A')}")
         prefix = cfg.get("r2_path_prefix", "")
         if prefix:
@@ -686,7 +719,8 @@ class xsync_tool:
             sys.exit(1)
 
         db_path = cfg.get("db_path", "")
-        interval = cfg.get("sync_interval", 3600)
+        # 向后兼容：优先使用 pull_interval，如果不存在则使用旧的 sync_interval
+        interval = cfg.get("pull_interval") or cfg.get("sync_interval", 3600)
         self._ls.restore_loop(db_path, interval)
 
 
