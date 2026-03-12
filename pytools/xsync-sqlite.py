@@ -16,6 +16,12 @@ xsync-sqlite — SQLite 同步工具
     # 查看状态
     python3 xsync-sqlite.py --status
 
+    # 停止服务
+    python3 xsync-sqlite.py --stop
+
+    # 启动服务
+    python3 xsync-sqlite.py --start
+
     # 手动同步
     python3 xsync-sqlite.py --sync
 
@@ -349,6 +355,18 @@ class xsync_service:
             capture_output=False,
         )
 
+    def stop(self):
+        """停止 systemd 服务。"""
+        sudo = [] if os.geteuid() == 0 else ["sudo"]
+        ret = subprocess.run([*sudo, "systemctl", "stop", self._service_name], capture_output=False)
+        return ret.returncode == 0
+
+    def start(self):
+        """启动 systemd 服务。"""
+        sudo = [] if os.geteuid() == 0 else ["sudo"]
+        ret = subprocess.run([*sudo, "systemctl", "start", self._service_name], capture_output=False)
+        return ret.returncode == 0
+
 
 # ============================================================
 # xsync_tool — 主编排（菜单 + 安装流水线）
@@ -384,6 +402,14 @@ class xsync_tool:
             help="启动 pull 定时循环（内部用，供 systemd 调用）",
         )
         parser.add_argument(
+            "--stop", action="store_true",
+            help="停止服务",
+        )
+        parser.add_argument(
+            "--start", action="store_true",
+            help="启动服务",
+        )
+        parser.add_argument(
             "--switch-mode", action="store_true",
             help="切换同步模式（push ↔ pull）",
         )
@@ -402,6 +428,12 @@ class xsync_tool:
             return
         if self._args.status:
             self._do_status()
+            return
+        if self._args.stop:
+            self._do_stop()
+            return
+        if self._args.start:
+            self._do_start()
             return
         if self._args.sync:
             self._do_sync()
@@ -423,10 +455,12 @@ class xsync_tool:
         print("  2) 查看服务状态")
         print("  3) 手动同步")
         print("  4) 切换同步模式")
+        print("  5) 停止服务")
+        print("  6) 启动服务")
         print("  0) 退出")
         print()
 
-        choice = input("请输入选项 (0/1/2/3/4): ").strip()
+        choice = input("请输入选项 (0-6): ").strip()
         if choice == "1":
             self._do_install()
         elif choice == "2":
@@ -435,6 +469,10 @@ class xsync_tool:
             self._do_sync()
         elif choice == "4":
             self._do_switch_mode()
+        elif choice == "5":
+            self._do_stop()
+        elif choice == "6":
+            self._do_start()
         elif choice in ("0", ""):
             print("已退出。")
         else:
@@ -730,6 +768,30 @@ class xsync_tool:
             print("  macOS 不支持 systemd，请手动管理同步。")
 
         print(f"\n[完成] 已切换到 {new_mode} 模式。")
+
+    # ---- 停止 / 启动服务 ----
+
+    def _do_stop(self):
+        """停止服务。"""
+        print("\n=== 停止服务 ===\n")
+        if platform.system() != "Linux":
+            print("  macOS 不支持 systemd 服务，无法停止。")
+            return
+        if self._svc.stop():
+            print("  ✓ 服务已停止。")
+        else:
+            print("  [错误] 停止服务失败。")
+
+    def _do_start(self):
+        """启动服务。"""
+        print("\n=== 启动服务 ===\n")
+        if platform.system() != "Linux":
+            print("  macOS 不支持 systemd 服务，无法启动。")
+            return
+        if self._svc.start():
+            print("  ✓ 服务已启动。")
+        else:
+            print("  [错误] 启动服务失败。")
 
     # ---- 查看状态 ----
 
