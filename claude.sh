@@ -528,14 +528,14 @@ EOF
 }
 
 # =============================================================================
-# 3) Trust All Tools — write permission bypass settings to settings.json
+# 3) Trust All Tools — write permission settings and cc alias
 # =============================================================================
 
 do_trust_all() {
     echo -e "\n${BLUE}=== Trust All Tools ===${NC}"
 
     if [ "$(id -u)" = "0" ]; then
-        echo -e "\n${YELLOW}[Notice] Running as root — will use dontAsk mode with full tool allowlist.${NC}"
+        echo -e "\n${YELLOW}[Notice] Running as root — will use full tool allowlist.${NC}"
     fi
 
     # ---- Check python3 ----
@@ -544,8 +544,11 @@ do_trust_all() {
         return 1
     fi
 
+    local total_steps=2
+    [ "$OS_TYPE" = "macos" ] && total_steps=3
+
     # ---- Ensure ~/.claude/settings.json ----
-    echo -e "\n${BLUE}[Step 1/2] Checking settings.json...${NC}"
+    echo -e "\n${BLUE}[Step 1/${total_steps}] Checking settings.json...${NC}"
     mkdir -p "$HOME/.claude"
     local file="$HOME/.claude/settings.json"
     if [ ! -f "$file" ]; then
@@ -556,7 +559,7 @@ do_trust_all() {
     fi
 
     # ---- Write trust-all settings ----
-    echo -e "\n${BLUE}[Step 2/2] Writing trust-all settings...${NC}"
+    echo -e "\n${BLUE}[Step 2/${total_steps}] Writing trust-all settings...${NC}"
 
     local tmp_py
     tmp_py=$(mktemp)
@@ -576,15 +579,14 @@ if "skipDangerousModePermissionPrompt" in data:
     del data["skipDangerousModePermissionPrompt"]
     changes.append("removedLegacy")
 
-# Use dontAsk + full allowlist (works for both root and non-root)
+# Set full tool allowlist (works for both root and non-root)
 perms = data.setdefault("permissions", {})
 all_tools = ["Bash", "Read", "Edit", "Write", "WebFetch", "WebSearch",
              "Glob", "Grep", "NotebookEdit", "Agent", "MCP"]
 
-if perms.get("defaultMode") != "dontAsk" or sorted(perms.get("allow", [])) != sorted(all_tools):
-    perms["defaultMode"] = "dontAsk"
+if sorted(perms.get("allow", [])) != sorted(all_tools):
     perms["allow"] = all_tools
-    changes.append("dontAsk+allowAll")
+    changes.append("allowAll")
 
 with open(file, "w") as f:
     json.dump(data, f, indent=2, ensure_ascii=False)
@@ -602,14 +604,32 @@ PYEOF
     if [ "$result" = "already" ]; then
         echo -e "  ${CYAN}Already set — no changes needed.${NC}"
     else
-        [[ "$result" == *dontAsk+allowAll* ]] && \
-            echo -e "  ${GREEN}✓${NC} permissions.defaultMode = dontAsk + allow all tools"
+        [[ "$result" == *allowAll* ]] && \
+            echo -e "  ${GREEN}✓${NC} permissions.allow = all tools"
         [[ "$result" == *removedLegacy* ]] && \
             echo -e "  ${GREEN}✓${NC} Removed legacy bypassPermissions settings"
     fi
 
-    echo -e "\n${GREEN}[Success] Permission prompts will no longer appear.${NC}"
-    echo -e "${CYAN}Restart Claude Code to apply.${NC}"
+    # ---- macOS: add cc alias ----
+    if [ "$OS_TYPE" = "macos" ]; then
+        echo -e "\n${BLUE}[Step 3/${total_steps}] Setting up 'cc' alias...${NC}"
+
+        local ALIAS_LINE="alias cc='claude --dangerously-skip-permissions'"
+
+        # Remove existing cc alias to avoid duplicates
+        if grep -q "^alias cc=" "$SHELL_RC" 2>/dev/null; then
+            sed_inplace "/^alias cc=/d" "$SHELL_RC"
+        fi
+
+        echo "$ALIAS_LINE" >> "$SHELL_RC"
+        echo -e "  ${GREEN}✓${NC} Added alias: ${CYAN}cc${NC} → claude --dangerously-skip-permissions"
+
+        echo -e "\n${GREEN}[Success] Permission prompts will no longer appear.${NC}"
+        print_source_reminder
+    else
+        echo -e "\n${GREEN}[Success] Permission prompts will no longer appear.${NC}"
+        echo -e "${CYAN}Restart Claude Code to apply.${NC}"
+    fi
 }
 
 # =============================================================================
