@@ -7,12 +7,6 @@ Use it to:
 - bring up a new **VPS** with SSH, GitHub access, and AI tooling
 - run each setup step independently with simple `curl | bash` commands
 
-## Quick Start
-
-```bash
-BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/<script>.sh | BFS_VER=$BFS_VER bash
-```
-
 ## Scripts
 
 | Script | What it does | Run |
