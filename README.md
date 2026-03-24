@@ -1,70 +1,97 @@
 # BitsFactor Scripts
 
-A collection of bootstrap scripts for developers. All scripts support **macOS** and **Linux**, and run independently via `curl | bash`. All scripts share a single version number defined in `version.sh`.
+Bootstrap scripts for Macs, Linux machines, and new VPS instances.
 
-## one.sh — One-Click VPS Setup
+- Supports **macOS** and **Linux**
+- Every script works with `curl | bash`
+- All scripts share one version from `version.sh`
 
-```bash
-BFS_VER=1.3.11; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh | BFS_VER=$BFS_VER bash
-```
-
-One command to fully initialize a new VPS. Downloads and orchestrates `env.sh`, `git.sh`, and `claude.sh` in sequence — each step asks for confirmation before running, so you can skip anything you don't need.
-
-- **Step 1** Install dev tools (env.sh install-all)
-- **Step 2** Set SSH private key (git.sh set-key)
-- **Step 3** Install Claude Code (claude.sh install)
-- **Step 4** Configure API (claude.sh set-api)
-- **Step 5** Trust All Tools (claude.sh trust-all) — Linux only
-
-## env.sh — Development Environment Setup
+## Quick Start
 
 ```bash
-BFS_VER=1.3.11; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/env.sh | BFS_VER=$BFS_VER bash
+BFS_VER=1.3.11
 ```
 
-One-command setup for a complete development environment on any fresh macOS or Linux machine. Installs Homebrew, Git, Python3, Node.js, Go, and Docker — each as an independent option or all at once.
-
-- **1) Install All** — Runs every step below in sequence: Homebrew (macOS) → Git → Python3 → Node.js → Go → Docker → SSH Port (Linux). Safe to re-run; already-installed tools are skipped.
-- **2) Install Homebrew** — macOS only. Installs Homebrew if not present. Skipped silently on Linux.
-- **3) Install Git** — Installs Git via Homebrew (macOS) or `apt-get` (Linux).
-- **4) Install Python3** — Installs Python3 + pip + venv via Homebrew (macOS) or `apt-get` (Linux).
-- **5) Install Node.js & npm** — Installs Node via Homebrew (macOS) or nvm LTS (Linux). Writes nvm init block to shell config.
-- **6) Install Go** — Installs Go via Homebrew (macOS) or downloads the official SDK to `~/.go_sdk` (Linux, no sudo required). Writes `GOROOT`/`PATH` to shell config.
-- **7) Install Docker** — Installs Docker via Homebrew cask (macOS) or official convenience script (Linux). Adds current user to docker group on Linux.
-- **8) Change SSH Port** — Linux only. Changes the SSH listening port in `sshd_config` and restarts sshd.
-
-## git.sh — SSH Key Manager
+### one.sh — One-Click VPS Setup
 
 ```bash
-BFS_VER=1.3.11; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/git.sh | BFS_VER=$BFS_VER bash
+curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh | BFS_VER=$BFS_VER bash
 ```
 
-The fastest way to set up GitHub SSH access across all your machines. Designed for solo developers who manage multiple VPS instances — generate a key pair once on your main computer, then share the same private key to every new server. No more repeated key generation or manual config.
+Runs `env.sh`, `git.sh`, and `claude.sh` in order, with confirmation before each step.
 
-- **1) Retrieve Keys** — Run on your main computer. Gets your SSH key pair (or generates one if none exists) and copies the private key to clipboard. Add the public key to [GitHub SSH Settings](https://github.com/settings/keys) once.
-- **2) Set Key** — Run on any new VPS or Mac. Paste your private key and the script handles the rest. Once done, you can `git clone` private repos immediately.
+**Steps**
+- **1** `env.sh install-all`
+- **2** `git.sh set-key`
+- **3** `claude.sh install`
+- **4** `claude.sh set-api`
+- **5** `claude.sh trust-all` — Linux only
 
-## claude.sh — Claude Code Setup
+### env.sh — Development Environment Setup
 
 ```bash
-BFS_VER=1.3.11; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/claude.sh | BFS_VER=$BFS_VER bash
+curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/env.sh | BFS_VER=$BFS_VER bash
 ```
 
-Install / update, configure, or uninstall Claude Code.
+Sets up a fresh macOS or Linux machine.
 
-- **1) Install / Update** — Install Claude Code, or update it if already installed. Automatically detects the install method (npm, Homebrew, official installer) and runs the matching upgrade command.
-- **2) Set API** — Enter your API endpoint and key. The script saves them and cleans up any old config automatically.
-- **3) Trust All Tools** — Skip all permission prompts.
-- **4) Install / Update oosp** — Fetch oosp spec from CDN and append to `~/.claude/CLAUDE.md` or project-level `CLAUDE.md`. Supports Chinese and English.
-- **5) Uninstall** — Remove Claude Code and all its config files. You can also choose to only clear config while keeping the program.
+**Menu**
+- **1** Install all
+- **2** Install Homebrew — macOS only
+- **3** Install Git
+- **4** Install Python3
+- **5** Install Node.js & npm
+- **6** Install Go
+- **7** Install Docker
+- **8** Change SSH Port — Linux only
 
-## pytools.sh — Python Tools Installer
+### git.sh — SSH Key Manager
 
 ```bash
-BFS_VER=1.3.11; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/pytools.sh | BFS_VER=$BFS_VER bash
+curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/git.sh | BFS_VER=$BFS_VER bash
 ```
 
-One-click deploy Python command-line tools to `~/pytools`. Downloads each tool from CDN, installs Python dependencies, and adds `~/pytools` to `PATH` — so every tool is callable by name from anywhere in the terminal.
+Sets up GitHub SSH access across your machines.
 
-- **1) Install / Update** — Downloads all Python tools to `~/pytools`, installs required dependencies into an isolated virtual environment (`~/pytools/.venv/`), and writes the `~/pytools` PATH block to your shell config.
-- **2) Uninstall** — Removes the `~/pytools/` directory and cleans up the PATH block from all shell config files.
+**Menu**
+- **1** Retrieve Keys
+- **2** Set Key
+
+### claude.sh — Claude Code Setup
+
+```bash
+curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/claude.sh | BFS_VER=$BFS_VER bash
+```
+
+Installs and configures Claude Code.
+
+**Menu**
+- **1** Install / Update
+- **2** Set API
+- **3** Trust All Tools
+- **4** Install / Update oosp
+- **5** Uninstall
+
+### codex.sh — Codex Setup
+
+```bash
+curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/codex.sh | BFS_VER=$BFS_VER bash
+```
+
+Installs Codex or configures a third-party API.
+
+**Menu**
+- **1** Install Codex
+- **2** Configure API
+
+### pytools.sh — Python Tools Installer
+
+```bash
+curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/pytools.sh | BFS_VER=$BFS_VER bash
+```
+
+Installs Python CLI tools to `~/pytools` and adds them to `PATH`.
+
+**Menu**
+- **1** Install / Update
+- **2** Uninstall

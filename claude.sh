@@ -56,6 +56,7 @@ esac
 
 # ---- Shared variables for API config cleanup ----
 
+DEFAULT_BASE_URL="https://api.develop.cc"
 CLEAN_VARS=("ANTHROPIC_BASE_URL" "ANTHROPIC_AUTH_TOKEN" "ANTHROPIC_API_KEY" "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC" "API_TIMEOUT_MS")
 BLOCK_START="# >>> Claude Code API"
 BLOCK_END="# <<< Claude Code API"
@@ -459,13 +460,9 @@ do_set_api() {
     # ---- Prompt for input ----
     echo -e "\n${BLUE}[Step 2/5] Enter API configuration...${NC}"
 
-    echo -e "${CYAN}Enter ANTHROPIC_BASE_URL (API endpoint):${NC}"
+    echo -e "${CYAN}Enter ANTHROPIC_BASE_URL (API endpoint) [${DEFAULT_BASE_URL}]:${NC}"
     tty_read INPUT_URL
-
-    if [ -z "$INPUT_URL" ]; then
-        echo -e "${RED}[Error] API endpoint cannot be empty.${NC}"
-        return 1
-    fi
+    : "${INPUT_URL:=$DEFAULT_BASE_URL}"
 
     # Auto-prepend https:// if no protocol specified
     if [[ "$INPUT_URL" != [hH][tT][tT][pP]://* ]] && [[ "$INPUT_URL" != [hH][tT][tT][pP][sS]://* ]]; then

@@ -49,7 +49,7 @@ TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 trap 'exit 130' INT TERM
 
-SCRIPTS=("version.sh" "env.sh" "git.sh" "claude.sh")
+SCRIPTS=("version.sh" "env.sh" "git.sh" "claude.sh" "codex.sh")
 
 echo -e "${BLUE}Downloading scripts...${NC}"
 for script in "${SCRIPTS[@]}"; do
@@ -71,9 +71,30 @@ echo -e "${BLUE}═════════════════════�
 echo -e "${BLUE}  BitsFactor One-Click VPS Setup v${VERSION}${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
 echo ""
-STEP_NAMES=("Install dev tools" "Set SSH private key" "Install Claude Code" "Configure API")
-if [ "$IS_LINUX" = true ]; then
-    STEP_NAMES+=("Trust All Tools")
+
+AI_CHOICE=""
+while :; do
+    echo -e "${CYAN}Choose AI assistant to install:${NC}"
+    echo -e "  ${GREEN}1)${NC} Claude Code"
+    echo -e "  ${GREEN}2)${NC} Codex"
+    tty_read AI_OPTION "Enter option (1-2): "
+    case "$AI_OPTION" in
+        1) AI_CHOICE="claude"; break ;;
+        2) AI_CHOICE="codex"; break ;;
+        *) echo -e "${RED}[Error] Invalid option: $AI_OPTION${NC}" ;;
+    esac
+    echo ""
+done
+
+echo ""
+STEP_NAMES=("Install dev tools" "Set SSH private key")
+if [ "$AI_CHOICE" = "claude" ]; then
+    STEP_NAMES+=("Install Claude Code" "Configure Claude API")
+    if [ "$IS_LINUX" = true ]; then
+        STEP_NAMES+=("Trust All Tools")
+    fi
+else
+    STEP_NAMES+=("Install Codex" "Configure Codex API")
 fi
 TOTAL=${#STEP_NAMES[@]}
 
@@ -146,12 +167,17 @@ run_step() {
 set +e  # run_step handles errors explicitly; disable errexit to prevent silent exits
 trap 'true' INT TERM  # during steps: absorb signals so Ctrl+C only kills the child process
 
-run_step 1 $TOTAL "env.sh"    "install-all" "${STEP_NAMES[0]}"
-run_step 2 $TOTAL "git.sh"    "set-key"     "${STEP_NAMES[1]}"
-run_step 3 $TOTAL "claude.sh" "install"     "${STEP_NAMES[2]}"
-run_step 4 $TOTAL "claude.sh" "set-api"     "${STEP_NAMES[3]}"
-if [ "$IS_LINUX" = true ]; then
-    run_step 5 $TOTAL "claude.sh" "trust-all" "${STEP_NAMES[4]}"
+run_step 1 $TOTAL "env.sh" "install-all" "${STEP_NAMES[0]}"
+run_step 2 $TOTAL "git.sh" "set-key"     "${STEP_NAMES[1]}"
+if [ "$AI_CHOICE" = "claude" ]; then
+    run_step 3 $TOTAL "claude.sh" "install"   "${STEP_NAMES[2]}"
+    run_step 4 $TOTAL "claude.sh" "set-api"   "${STEP_NAMES[3]}"
+    if [ "$IS_LINUX" = true ]; then
+        run_step 5 $TOTAL "claude.sh" "trust-all" "${STEP_NAMES[4]}"
+    fi
+else
+    run_step 3 $TOTAL "codex.sh" "install"   "${STEP_NAMES[2]}"
+    run_step 4 $TOTAL "codex.sh" "set-api"   "${STEP_NAMES[3]}"
 fi
 
 trap - INT TERM  # restore default signal handling after steps
