@@ -67,6 +67,14 @@ BREW_BLOCK_END="# <<< BitsFactor brew shellenv"
 
 # ---- Shared functions ----
 
+# tty_read: read one line from /dev/tty
+# Args: $1 = variable name to store result
+#       $2 = (optional) prompt string (written directly to /dev/tty)
+tty_read() {
+    [ -n "$2" ] && printf '%s' "$2" > /dev/tty
+    IFS= read -r "$1" < /dev/tty || true
+}
+
 # has_path_block: check if a PATH block marker already exists in any shell config
 # Scans ~/.zshrc, ~/.bashrc, ~/.bash_profile to prevent duplicate writes.
 # Uses -F (fixed string) to avoid regex interpretation of marker text.
@@ -492,10 +500,27 @@ do_change_ssh_port() {
     : "${CURRENT_PORT:=22}"
     echo -e "Current SSH port: ${CYAN}${CURRENT_PORT}${NC}"
 
-    # Get new port: use $1 if provided, otherwise prompt interactively
+    if [ "$CURRENT_PORT" != "22" ]; then
+        echo -e "${YELLOW}[Skip] SSH port is already ${CURRENT_PORT}, only default port 22 will be changed.${NC}"
+        return 0
+    fi
+
+    # Ask whether to change the port; use $1 if provided, otherwise prompt interactively
     local NEW_PORT="${1:-}"
     if [ -z "$NEW_PORT" ]; then
-        read -rp "Enter new SSH port [60101]: " NEW_PORT < /dev/tty
+        local CHANGE_PORT=""
+        echo -e "${CYAN}SSH port is still the default 22.${NC}"
+        tty_read CHANGE_PORT "Do you want to change it now? (y/N): "
+        case "$CHANGE_PORT" in
+            y|Y|yes|YES)
+                ;;
+            *)
+                echo -e "${YELLOW}[Skip] SSH port unchanged.${NC}"
+                return 0
+                ;;
+        esac
+
+        tty_read NEW_PORT "Enter new SSH port [60101]: "
         : "${NEW_PORT:=60101}"
     fi
 
@@ -541,7 +566,8 @@ do_install_all() {
     if [ "$OS_TYPE" = "macos" ]; then
         echo -e "${CYAN}Installing: Brew + Git + Python3 + Node.js + Go + Docker${NC}\n"
     else
-        echo -e "${CYAN}Installing: Git + Python3 + Node.js + Go + Docker + SSH Port${NC}\n"
+        echo -e "${CYAN}Installing: Git + Python3 + Node.js + Go + Docker${NC}"
+        echo -e "${CYAN}After that, you can choose whether to change the SSH port if it is still 22.${NC}\n"
     fi
 
     # Track per-step result (0 = ok, 1 = failed) for the summary.
@@ -555,7 +581,7 @@ do_install_all() {
     do_install_node    || node_rc=1
     do_install_go      || go_rc=1
     do_install_docker  || docker_rc=1
-    do_change_ssh_port 60101 || ssh_rc=1
+    do_change_ssh_port || ssh_rc=1
 
     local SHELL_RC_DISPLAY="${SHELL_RC/#$HOME/~}"
 
@@ -612,7 +638,7 @@ echo -e "${CYAN}Select an option:${NC}"
 if [ "$OS_TYPE" = "macos" ]; then
     echo -e "  ${GREEN}1)${NC} Install All  (Brew + Git + Python3 + Node.js + Go + Docker)"
 else
-    echo -e "  ${GREEN}1)${NC} Install All  (Git + Python3 + Node.js + Go + Docker + SSH Port)"
+    echo -e "  ${GREEN}1)${NC} Install All  (Git + Python3 + Node.js + Go + Docker; optionally change SSH Port)"
 fi
 echo -e "  ${GREEN}2)${NC} Install Homebrew  ${YELLOW}[macOS only]${NC}"
 echo -e "  ${GREEN}3)${NC} Install Git"
@@ -620,7 +646,7 @@ echo -e "  ${GREEN}4)${NC} Install Python3"
 echo -e "  ${GREEN}5)${NC} Install Node.js & npm"
 echo -e "  ${GREEN}6)${NC} Install Go"
 echo -e "  ${GREEN}7)${NC} Install Docker"
-echo -e "  ${GREEN}8)${NC} Change SSH Port  ${YELLOW}[Linux only]${NC}"
+echo -e "  ${GREEN}8)${NC} Change SSH Port  ${YELLOW}[Linux only, asks before changing]${NC}"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
 read -p "Enter option (0-8): " MENU_CHOICE < /dev/tty
