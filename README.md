@@ -1,9 +1,9 @@
 # BitsFactor Scripts
 
-Simple bootstrap scripts for fresh Macs, Linux machines, and VPS instances.
+Lightweight bootstrap scripts for fresh Macs, Linux machines, and VPS instances.
 
 <p align="center">
-  <strong>One version • Independent scripts • curl | bash friendly</strong>
+  <strong>One version · Standalone scripts · curl | bash friendly</strong>
 </p>
 
 ## Quick Start
@@ -12,22 +12,24 @@ Simple bootstrap scripts for fresh Macs, Linux machines, and VPS instances.
 BFS_VER=1.3.12
 ```
 
-Or run any script directly with the version inline:
+Use any script with the same pattern:
 
 ```bash
-BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh | BFS_VER=$BFS_VER bash
+BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/<script>.sh | BFS_VER=$BFS_VER bash
 ```
 
-## Scripts
+## Script Index
 
-| Script | What it does | Run |
+| Script | Purpose | Run |
 | --- | --- | --- |
-| `one.sh` | Guided VPS setup | BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh &#124; BFS_VER=$BFS_VER bash |
-| `env.sh` | Install dev tools | BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/env.sh &#124; BFS_VER=$BFS_VER bash |
-| `git.sh` | Set up GitHub SSH keys | BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/git.sh &#124; BFS_VER=$BFS_VER bash |
-| `claude.sh` | Install and configure Claude Code | BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/claude.sh &#124; BFS_VER=$BFS_VER bash |
-| `codex.sh` | Install and configure Codex | BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/codex.sh &#124; BFS_VER=$BFS_VER bash |
-| `pytools.sh` | Install Python CLI tools | BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/pytools.sh &#124; BFS_VER=$BFS_VER bash |
+| `one.sh` | Full guided VPS setup | BFS_VER=1.3.12;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh &#124; BFS_VER=$BFS_VER bash |
+| `env.sh` | Dev environment setup | BFS_VER=1.3.12;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/env.sh &#124; BFS_VER=$BFS_VER bash |
+| `git.sh` | GitHub SSH key setup | BFS_VER=1.3.12;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/git.sh &#124; BFS_VER=$BFS_VER bash |
+| `claude.sh` | Claude Code install + config | BFS_VER=1.3.12;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/claude.sh &#124; BFS_VER=$BFS_VER bash |
+| `codex.sh` | Codex install + config | BFS_VER=1.3.12;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/codex.sh &#124; BFS_VER=$BFS_VER bash |
+| `pytools.sh` | Python CLI tools | BFS_VER=1.3.12;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/pytools.sh &#124; BFS_VER=$BFS_VER bash |
+
+> Tip: the table is for quick copy. Each section below also has its own code block with GitHub's copy button.
 
 ---
 
@@ -37,12 +39,12 @@ BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$B
 BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh | BFS_VER=$BFS_VER bash
 ```
 
-Best for a brand-new VPS.
+For a brand-new VPS.
 
-- Installs dev tools
-- Sets SSH key
-- Lets you choose **Claude Code** or **Codex**
-- Runs the matching API setup flow
+- Install dev tools
+- Set SSH key
+- Choose **Claude Code** or **Codex**
+- Run the matching API setup flow
 
 ---
 
@@ -52,7 +54,7 @@ Best for a brand-new VPS.
 BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/env.sh | BFS_VER=$BFS_VER bash
 ```
 
-Best for a fresh machine.
+For a fresh machine.
 
 **Includes**
 - Homebrew — macOS only
@@ -71,7 +73,7 @@ Best for a fresh machine.
 BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/git.sh | BFS_VER=$BFS_VER bash
 ```
 
-Best for syncing one SSH key across machines.
+For reusing one SSH key across machines.
 
 **Menu**
 - Retrieve keys
@@ -85,7 +87,7 @@ Best for syncing one SSH key across machines.
 BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/claude.sh | BFS_VER=$BFS_VER bash
 ```
 
-Best for Claude Code install and API setup.
+For Claude Code install and API setup.
 
 **Menu**
 - Install / Update
@@ -102,7 +104,7 @@ Best for Claude Code install and API setup.
 BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/codex.sh | BFS_VER=$BFS_VER bash
 ```
 
-Best for Codex install and third-party API setup.
+For Codex install and third-party API setup.
 
 **Menu**
 - Install Codex
@@ -116,7 +118,7 @@ Best for Codex install and third-party API setup.
 BFS_VER=1.3.12; curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/pytools.sh | BFS_VER=$BFS_VER bash
 ```
 
-Best for installing CLI Python tools into `~/pytools`.
+For installing CLI Python tools into `~/pytools`.
 
 **Menu**
 - Install / Update
