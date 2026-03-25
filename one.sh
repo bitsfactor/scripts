@@ -41,6 +41,30 @@ case "$(uname -s | tr '[:upper:]' '[:lower:]')" in
     *)       IS_LINUX=false ;;
 esac
 
+# Detect shell RC
+USER_SHELL="$(basename "${SHELL:-/bin/bash}")"
+case "$USER_SHELL" in
+    zsh)  SHELL_RC="$HOME/.zshrc" ;;
+    *)
+        if [ "$IS_LINUX" = true ]; then
+            SHELL_RC="$HOME/.bashrc"
+        else
+            SHELL_RC="$HOME/.bash_profile"
+        fi
+        ;;
+esac
+
+reload_shell_rc() {
+    local rc_display="${SHELL_RC/#$HOME/~}"
+
+    if [ ! -f "$SHELL_RC" ]; then
+        return 0
+    fi
+
+    echo -e "\n${BLUE}[Info] Reloading ${rc_display} for later steps...${NC}"
+    . "$SHELL_RC" || true
+}
+
 # =============================================================================
 # Download phase — fetch scripts to temp directory
 # =============================================================================
@@ -171,6 +195,9 @@ set +e  # run_step handles errors explicitly; disable errexit to prevent silent 
 trap 'true' INT TERM  # during steps: absorb signals so Ctrl+C only kills the child process
 
 run_step 1 $TOTAL "env.sh" "install-all" "${STEP_NAMES[0]}"
+if [ "${RESULTS[0]:-2}" = "0" ]; then
+    reload_shell_rc
+fi
 run_step 2 $TOTAL "git.sh" "set-key"     "${STEP_NAMES[1]}"
 if [ "$AI_CHOICE" = "claude" ]; then
     run_step 3 $TOTAL "claude.sh" "install"   "${STEP_NAMES[2]}"
