@@ -93,7 +93,7 @@ clean_shell_config() {
     local cleaned=false
 
     # 1) Remove marker block
-    if grep -q "$BLOCK_START" "$file" 2>/dev/null; then
+    if grep -qF "$BLOCK_START" "$file" 2>/dev/null; then
         sed_inplace "/$BLOCK_START/,/$BLOCK_END/d" "$file"
         cleaned=true
     fi
@@ -348,7 +348,7 @@ detect_install_method() {
 ensure_local_bin_in_path() {
     local local_bin="$HOME/.local/bin"
     # 已在配置文件中则跳过（避免重复写入）
-    if grep -qF '.local/bin' "$SHELL_RC" 2>/dev/null; then
+    if grep -qF '$HOME/.local/bin' "$SHELL_RC" 2>/dev/null; then
         return 0
     fi
     # 写入 shell 配置文件
@@ -465,7 +465,7 @@ do_set_api() {
     : "${INPUT_URL:=$DEFAULT_BASE_URL}"
 
     # Auto-prepend https:// if no protocol specified
-    if [[ "$INPUT_URL" != [hH][tT][tT][pP]://* ]] && [[ "$INPUT_URL" != [hH][tT][tT][pP][sS]://* ]]; then
+    if [[ "$INPUT_URL" != http://* ]] && [[ "$INPUT_URL" != https://* ]]; then
         INPUT_URL="https://${INPUT_URL}"
         echo -e "${YELLOW}[Auto] Added https:// prefix → ${INPUT_URL}${NC}"
     fi
@@ -665,7 +665,7 @@ do_uninstall() {
         echo -e "  ${YELLOW}~/.claude.json${NC}"
     fi
 
-    for bf in "$HOME"/.claude.json.backup*; do
+    for bf in "$HOME"/.claude.json.backup.*; do
         [ -e "$bf" ] || continue
         ITEMS_TO_CLEAN+=("$bf")
         echo -e "  ${YELLOW}~/${bf##*/}${NC}"
@@ -684,7 +684,7 @@ do_uninstall() {
     # Check for shell config entries
     local HAS_SHELL_CONFIG=false
     for rc in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile"; do
-        if [ -f "$rc" ] && grep -q "$BLOCK_START" "$rc" 2>/dev/null; then
+        if [ -f "$rc" ] && grep -qF "$BLOCK_START" "$rc" 2>/dev/null; then
             HAS_SHELL_CONFIG=true
             echo -e "  ${YELLOW}${rc/#$HOME/~}${NC} (API env vars)"
         fi

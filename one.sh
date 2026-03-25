@@ -46,8 +46,11 @@ esac
 # =============================================================================
 
 TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
-trap 'exit 130' INT TERM
+cleanup_tmp_dir() {
+    rm -rf "$TMP_DIR"
+}
+trap 'cleanup_tmp_dir; exit 130' INT TERM
+trap 'cleanup_tmp_dir' EXIT
 
 SCRIPTS=("version.sh" "env.sh" "git.sh" "claude.sh" "codex.sh")
 
@@ -205,7 +208,13 @@ echo -e "${BLUE}═════════════════════�
 USER_SHELL="$(basename "${SHELL:-/bin/bash}")"
 case "$USER_SHELL" in
     zsh)  SHELL_RC="$HOME/.zshrc" ;;
-    *)    SHELL_RC="$HOME/.bashrc" ;;
+    *)
+        if [ "$IS_LINUX" = true ]; then
+            SHELL_RC="$HOME/.bashrc"
+        else
+            SHELL_RC="$HOME/.bash_profile"
+        fi
+        ;;
 esac
 
 echo -e "\n${YELLOW}[Reminder] To apply all PATH/env changes:${NC}"

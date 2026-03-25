@@ -169,7 +169,7 @@ do_set_api() {
     tty_read INPUT_URL "Enter OPENAI_BASE_URL [${DEFAULT_BASE_URL}]: "
     : "${INPUT_URL:=$DEFAULT_BASE_URL}"
 
-    if [[ "$INPUT_URL" != [hH][tT][tT][pP]://* ]] && [[ "$INPUT_URL" != [hH][tT][tT][pP][sS]://* ]]; then
+    if [[ "$INPUT_URL" != http://* ]] && [[ "$INPUT_URL" != https://* ]]; then
         INPUT_URL="https://${INPUT_URL}"
         echo -e "${YELLOW}[Auto] Added https:// prefix → ${INPUT_URL}${NC}"
     fi

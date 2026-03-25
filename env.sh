@@ -312,15 +312,15 @@ do_install_node() {
         nvm install --lts || return 1
         nvm use --lts     || return 1
 
-        # Write nvm init block only if no NVM_DIR line exists yet in shell RC
-        if ! grep -qF 'NVM_DIR' "$SHELL_RC" 2>/dev/null; then
+        # Write nvm init block only if our managed block is not already present
+        if ! has_path_block "$NVM_BLOCK_START"; then
             local nvm_content
             nvm_content='export NVM_DIR="$HOME/.nvm"'
             nvm_content="${nvm_content}"$'\n''[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'
             nvm_content="${nvm_content}"$'\n''[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"'
             write_path_block "$NVM_BLOCK_START" "$NVM_BLOCK_END" "$nvm_content"
         else
-            echo -e "  ${YELLOW}[Skip]${NC} nvm init already present in ${SHELL_RC/#$HOME/~}"
+            echo -e "  ${YELLOW}[Skip]${NC} nvm init already present in shell config"
         fi
     fi
 
@@ -496,7 +496,7 @@ do_change_ssh_port() {
 
     # Show current port
     local CURRENT_PORT
-    CURRENT_PORT=$(grep -E '^Port ' "$SSHD_CONFIG" 2>/dev/null | awk '{print $2}' | tail -1)
+    CURRENT_PORT=$(awk '/^Port / { port=$2 } END { print port }' "$SSHD_CONFIG" 2>/dev/null)
     : "${CURRENT_PORT:=22}"
     echo -e "Current SSH port: ${CYAN}${CURRENT_PORT}${NC}"
 
