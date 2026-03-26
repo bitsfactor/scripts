@@ -3,7 +3,7 @@
 # =============================================================================
 # Codex Setup Tool
 # Install Codex CLI or configure third-party API access.
-# Supports macOS and Linux (Debian / Ubuntu).
+# Supports macOS and Linux.
 #
 # Usage:
 #   bash codex.sh
@@ -62,6 +62,8 @@ CODEX_CONFIG_FILE="$CODEX_CONFIG_DIR/config.toml"
 CLEAN_VARS=("OPENAI_API_KEY" "OPENAI_BASE_URL")
 BLOCK_START="# >>> BitsFactor codex API"
 BLOCK_END="# <<< BitsFactor codex API"
+FULL_AUTO_BLOCK_START="# >>> BitsFactor codex full-auto"
+FULL_AUTO_BLOCK_END="# <<< BitsFactor codex full-auto"
 
 # ---- Shared functions ----
 
@@ -71,6 +73,11 @@ BLOCK_END="# <<< BitsFactor codex API"
 tty_read() {
     [ -n "$2" ] && printf '%s' "$2" > /dev/tty
     IFS= read -r "$1" < /dev/tty || true
+}
+
+has_shell_block() {
+    local marker="$1"
+    [ -f "$SHELL_RC" ] && grep -qF "$marker" "$SHELL_RC" 2>/dev/null
 }
 
 # sed_inplace: cross-platform sed -i wrapper
@@ -124,6 +131,85 @@ print_source_reminder() {
     echo -e "${YELLOW}════════════════════════════════════════${NC}"
 }
 
+install_ripgrep_linux() {
+    local SUDO=""
+    [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+
+    if command -v apt-get &> /dev/null; then
+        echo -e "${BLUE}Installing ripgrep via apt-get...${NC}"
+        $SUDO apt-get update -qq || return 1
+        $SUDO apt-get install -y ripgrep || return 1
+    elif command -v dnf &> /dev/null; then
+        echo -e "${BLUE}Installing ripgrep via dnf...${NC}"
+        $SUDO dnf install -y ripgrep || return 1
+    elif command -v yum &> /dev/null; then
+        echo -e "${BLUE}Installing ripgrep via yum...${NC}"
+        $SUDO yum install -y ripgrep || return 1
+    elif command -v pacman &> /dev/null; then
+        echo -e "${BLUE}Installing ripgrep via pacman...${NC}"
+        $SUDO pacman -Sy --noconfirm ripgrep || return 1
+    elif command -v zypper &> /dev/null; then
+        echo -e "${BLUE}Installing ripgrep via zypper...${NC}"
+        $SUDO zypper --non-interactive install ripgrep || return 1
+    elif command -v apk &> /dev/null; then
+        echo -e "${BLUE}Installing ripgrep via apk...${NC}"
+        $SUDO apk add --no-cache ripgrep || return 1
+    else
+        echo -e "${RED}[Error] No supported Linux package manager found for ripgrep.${NC}"
+        echo -e "${YELLOW}Supported managers: apt-get, dnf, yum, pacman, zypper, apk.${NC}"
+        return 1
+    fi
+}
+
+ensure_ripgrep() {
+    echo -e "\n${BLUE}[Step 2/4] Checking ripgrep (rg)...${NC}"
+
+    if command -v rg &> /dev/null; then
+        echo -e "  ${GREEN}✓${NC} rg found: $(rg --version | head -1)"
+        return 0
+    fi
+
+    echo -e "${YELLOW}[Notice] rg not found. Installing ripgrep...${NC}"
+
+    if [ "$OS_TYPE" = "macos" ]; then
+        if ! command -v brew &> /dev/null; then
+            echo -e "${RED}[Error] Homebrew is required to install ripgrep on macOS.${NC}"
+            echo -e "${YELLOW}Please install Homebrew first (run env.sh and select 'Install Homebrew').${NC}"
+            return 1
+        fi
+        brew install ripgrep || return 1
+    else
+        install_ripgrep_linux || return 1
+    fi
+
+    if command -v rg &> /dev/null; then
+        echo -e "  ${GREEN}✓${NC} rg installed: $(rg --version | head -1)"
+    else
+        echo -e "${RED}[Error] ripgrep installation may have failed.${NC}"
+        return 1
+    fi
+}
+
+setup_codex_full_auto() {
+    echo -e "\n${BLUE}[Step 4/4] Setting Codex default mode...${NC}"
+
+    if has_shell_block "$FULL_AUTO_BLOCK_START"; then
+        echo -e "  ${YELLOW}[Skip]${NC} codex full-auto alias already exists in shell config"
+        return 0
+    fi
+
+    touch "$SHELL_RC"
+    cat >> "$SHELL_RC" << EOF
+
+${FULL_AUTO_BLOCK_START}
+alias codex='command codex --full-auto'
+${FULL_AUTO_BLOCK_END}
+EOF
+
+    echo -e "  ${GREEN}✓${NC} Defaulted ${CYAN}codex${NC} to ${CYAN}codex --full-auto${NC}"
+    echo -e "  ${GREEN}✓${NC} Written to ${SHELL_RC/#$HOME/~}"
+}
+
 # =============================================================================
 # 1) Install Codex
 # =============================================================================
@@ -132,7 +218,7 @@ do_install_codex() {
     echo -e "\n${BLUE}=== Install Codex ===${NC}"
     echo -e "Detected OS: ${CYAN}${OS_TYPE}${NC}"
 
-    echo -e "\n${BLUE}[Step 1/2] Checking npm...${NC}"
+    echo -e "\n${BLUE}[Step 1/4] Checking npm...${NC}"
     if ! command -v npm &> /dev/null; then
         echo -e "${RED}[Error] npm not found.${NC}"
         echo -e "${YELLOW}Please install Node.js first (run env.sh and select 'Install Node.js & npm').${NC}"
@@ -140,13 +226,18 @@ do_install_codex() {
     fi
     echo -e "  ${GREEN}✓${NC} npm found: $(npm --version)"
 
-    echo -e "\n${BLUE}[Step 2/2] Installing Codex CLI...${NC}"
+    ensure_ripgrep || return 1
+
+    echo -e "\n${BLUE}[Step 3/4] Installing Codex CLI...${NC}"
     npm i -g @openai/codex || return 1
 
     if command -v codex &> /dev/null; then
+        setup_codex_full_auto || return 1
+
         echo -e "\n${CYAN}Current version:${NC}"
         codex --version 2>/dev/null || echo -e "${YELLOW}[Warning] Could not retrieve version.${NC}"
         echo -e "\n${GREEN}[Success] Codex is ready!${NC}"
+        print_source_reminder
     else
         echo -e "${RED}[Error] Codex installation may have failed.${NC}"
         return 1
