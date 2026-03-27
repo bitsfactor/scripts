@@ -7,6 +7,8 @@
 #
 # Usage:
 #   bash env.sh
+# Optional:
+#   BFS_TIMEZONE=UTC bash env.sh
 # =============================================================================
 
 set -e
@@ -18,6 +20,7 @@ _SCRIPT_DIR=""
 [ -n "$BFS_VER" ] && VERSION="$BFS_VER"
 
 : "${CDN_BASE:=https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v${VERSION}}"
+: "${BFS_TIMEZONE:=Asia/Shanghai}"
 
 # Color definitions
 GREEN='\033[32m'
@@ -117,7 +120,84 @@ write_path_block() {
 }
 
 # =============================================================================
-# 1) Install Homebrew (macOS only)
+# 1) Set System Timezone
+# =============================================================================
+
+do_set_timezone() {
+    echo -e "\n${BLUE}=== Set System Timezone ===${NC}"
+
+    local target_tz="${1:-$BFS_TIMEZONE}"
+    local current_tz=""
+    local SUDO=""
+    [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+
+    if [ -z "$target_tz" ]; then
+        echo -e "${RED}[Error] Timezone cannot be empty.${NC}"
+        return 1
+    fi
+
+    case "$OS_TYPE" in
+        linux)
+            if [ ! -e "/usr/share/zoneinfo/$target_tz" ]; then
+                echo -e "${RED}[Error] Timezone not found: ${target_tz}${NC}"
+                return 1
+            fi
+
+            if command -v timedatectl &> /dev/null; then
+                current_tz=$(timedatectl show --property=Timezone --value 2>/dev/null || true)
+            elif [ -L /etc/localtime ]; then
+                current_tz=$(readlink /etc/localtime 2>/dev/null | sed 's#^.*zoneinfo/##')
+            elif [ -f /etc/timezone ]; then
+                current_tz=$(cat /etc/timezone 2>/dev/null)
+            fi
+
+            if [ "$current_tz" = "$target_tz" ]; then
+                echo -e "${GREEN}[Skip] System timezone is already ${target_tz}.${NC}"
+                return 0
+            fi
+
+            echo -e "${BLUE}Setting Linux timezone to ${target_tz}...${NC}"
+            if command -v timedatectl &> /dev/null; then
+                if ! $SUDO timedatectl set-timezone "$target_tz"; then
+                    echo -e "  ${YELLOW}[Warning]${NC} timedatectl is unavailable, falling back to /etc/localtime"
+                    $SUDO ln -snf "/usr/share/zoneinfo/$target_tz" /etc/localtime || return 1
+                    if [ -e /etc/timezone ] || [ -d /etc ]; then
+                        printf '%s\n' "$target_tz" | $SUDO tee /etc/timezone > /dev/null || return 1
+                    fi
+                fi
+            else
+                $SUDO ln -snf "/usr/share/zoneinfo/$target_tz" /etc/localtime || return 1
+                if [ -e /etc/timezone ] || [ -d /etc ]; then
+                    printf '%s\n' "$target_tz" | $SUDO tee /etc/timezone > /dev/null || return 1
+                fi
+            fi
+            ;;
+        macos)
+            if ! command -v systemsetup &> /dev/null; then
+                echo -e "${RED}[Error] systemsetup not found. Cannot set macOS timezone.${NC}"
+                return 1
+            fi
+
+            current_tz=$(systemsetup -gettimezone 2>/dev/null | sed 's/^Time Zone: //')
+            if [ "$current_tz" = "$target_tz" ]; then
+                echo -e "${GREEN}[Skip] System timezone is already ${target_tz}.${NC}"
+                return 0
+            fi
+
+            echo -e "${BLUE}Setting macOS timezone to ${target_tz}...${NC}"
+            $SUDO systemsetup -settimezone "$target_tz" > /dev/null || return 1
+            ;;
+        *)
+            echo -e "${RED}[Error] Unsupported OS for timezone setup: ${OS_TYPE}${NC}"
+            return 1
+            ;;
+    esac
+
+    echo -e "${GREEN}[Success] System timezone set to ${target_tz}${NC}"
+}
+
+# =============================================================================
+# 2) Install Homebrew (macOS only)
 # =============================================================================
 
 do_install_brew() {
@@ -181,7 +261,7 @@ do_install_brew() {
 }
 
 # =============================================================================
-# 2) Install Git
+# 3) Install Git
 # =============================================================================
 
 do_install_git() {
@@ -217,7 +297,7 @@ do_install_git() {
 }
 
 # =============================================================================
-# 3) Install Python3
+# 4) Install Python3
 # =============================================================================
 
 do_install_python() {
@@ -265,7 +345,7 @@ do_install_python() {
 }
 
 # =============================================================================
-# 4) Install Node.js & npm
+# 5) Install Node.js & npm
 # =============================================================================
 
 do_install_node() {
@@ -328,7 +408,7 @@ do_install_node() {
 }
 
 # =============================================================================
-# 5) Install Go SDK
+# 6) Install Go SDK
 # =============================================================================
 
 do_install_go() {
@@ -422,7 +502,7 @@ do_install_go() {
 }
 
 # =============================================================================
-# 6) Install Docker
+# 7) Install Docker
 # =============================================================================
 
 do_install_docker() {
@@ -474,7 +554,7 @@ do_install_docker() {
 }
 
 # =============================================================================
-# 7) Change SSH Port (Linux only)
+# 8) Change SSH Port (Linux only)
 # =============================================================================
 
 do_change_ssh_port() {
@@ -564,9 +644,9 @@ do_change_ssh_port() {
 do_install_all() {
     echo -e "\n${BLUE}=== Install All ===${NC}"
     if [ "$OS_TYPE" = "macos" ]; then
-        echo -e "${CYAN}Installing: Brew + Git + Python3 + Node.js + Go + Docker${NC}\n"
+        echo -e "${CYAN}Installing: Timezone + Brew + Git + Python3 + Node.js + Go + Docker${NC}\n"
     else
-        echo -e "${CYAN}Installing: Git + Python3 + Node.js + Go + Docker${NC}"
+        echo -e "${CYAN}Installing: Timezone + Git + Python3 + Node.js + Go + Docker${NC}"
         echo -e "${CYAN}After that, you can choose whether to change the SSH port if it is still 22.${NC}\n"
     fi
 
@@ -574,7 +654,8 @@ do_install_all() {
     # Each function uses explicit || return 1 on critical commands so that
     # failures are reported accurately on both bash 3.x and bash 5.x,
     # regardless of whether set -e is inherited in the || call context.
-    local brew_rc=0 git_rc=0 python_rc=0 node_rc=0 go_rc=0 docker_rc=0 ssh_rc=0
+    local timezone_rc=0 brew_rc=0 git_rc=0 python_rc=0 node_rc=0 go_rc=0 docker_rc=0 ssh_rc=0
+    do_set_timezone   || timezone_rc=1
     do_install_brew    || brew_rc=1
     do_install_git     || git_rc=1
     do_install_python  || python_rc=1
@@ -588,6 +669,7 @@ do_install_all() {
     echo -e "\n${CYAN}========================================${NC}"
     echo -e "${CYAN}  Summary${NC}"
     echo -e "${CYAN}========================================${NC}"
+    [ "$timezone_rc" -eq 0 ] && echo -e "  ${GREEN}✓${NC}  System Timezone (${BFS_TIMEZONE})" || echo -e "  ${RED}✗${NC}  System Timezone (${BFS_TIMEZONE})"
     # Homebrew is macOS-only; omit from summary on Linux to avoid confusion
     if [ "$OS_TYPE" = "macos" ]; then
         [ "$brew_rc"    -eq 0 ] && echo -e "  ${GREEN}✓${NC}  Homebrew"    || echo -e "  ${RED}✗${NC}  Homebrew"
@@ -614,6 +696,7 @@ do_install_all() {
 if [ $# -gt 0 ]; then
     case "$1" in
         install-all)    do_install_all ;;
+        set-timezone)   do_set_timezone "${2:-}" ;;
         install-brew)   do_install_brew ;;
         install-git)    do_install_git ;;
         install-python) do_install_python ;;
@@ -636,30 +719,32 @@ echo -e "Shell config:  ${CYAN}${SHELL_RC/#$HOME/~}${NC}\n"
 
 echo -e "${CYAN}Select an option:${NC}"
 if [ "$OS_TYPE" = "macos" ]; then
-    echo -e "  ${GREEN}1)${NC} Install All  (Brew + Git + Python3 + Node.js + Go + Docker)"
+    echo -e "  ${GREEN}1)${NC} Install All  (Timezone + Brew + Git + Python3 + Node.js + Go + Docker)"
 else
-    echo -e "  ${GREEN}1)${NC} Install All  (Git + Python3 + Node.js + Go + Docker; optionally change SSH Port)"
+    echo -e "  ${GREEN}1)${NC} Install All  (Timezone + Git + Python3 + Node.js + Go + Docker; optionally change SSH Port)"
 fi
-echo -e "  ${GREEN}2)${NC} Install Homebrew  ${YELLOW}[macOS only]${NC}"
-echo -e "  ${GREEN}3)${NC} Install Git"
-echo -e "  ${GREEN}4)${NC} Install Python3"
-echo -e "  ${GREEN}5)${NC} Install Node.js & npm"
-echo -e "  ${GREEN}6)${NC} Install Go"
-echo -e "  ${GREEN}7)${NC} Install Docker"
-echo -e "  ${GREEN}8)${NC} Change SSH Port  ${YELLOW}[Linux only, asks before changing]${NC}"
+echo -e "  ${GREEN}2)${NC} Set System Timezone  ${YELLOW}[default: ${BFS_TIMEZONE}]${NC}"
+echo -e "  ${GREEN}3)${NC} Install Homebrew  ${YELLOW}[macOS only]${NC}"
+echo -e "  ${GREEN}4)${NC} Install Git"
+echo -e "  ${GREEN}5)${NC} Install Python3"
+echo -e "  ${GREEN}6)${NC} Install Node.js & npm"
+echo -e "  ${GREEN}7)${NC} Install Go"
+echo -e "  ${GREEN}8)${NC} Install Docker"
+echo -e "  ${GREEN}9)${NC} Change SSH Port  ${YELLOW}[Linux only, asks before changing]${NC}"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
-read -p "Enter option (0-8): " MENU_CHOICE < /dev/tty
+read -p "Enter option (0-9): " MENU_CHOICE < /dev/tty
 
 case "$MENU_CHOICE" in
     1) do_install_all ;;
-    2) do_install_brew ;;
-    3) do_install_git ;;
-    4) do_install_python ;;
-    5) do_install_node ;;
-    6) do_install_go ;;
-    7) do_install_docker ;;
-    8) do_change_ssh_port ;;
+    2) do_set_timezone ;;
+    3) do_install_brew ;;
+    4) do_install_git ;;
+    5) do_install_python ;;
+    6) do_install_node ;;
+    7) do_install_go ;;
+    8) do_install_docker ;;
+    9) do_change_ssh_port ;;
     0|"")
         echo -e "${YELLOW}Exited.${NC}"
         exit 0
