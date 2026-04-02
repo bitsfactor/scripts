@@ -75,6 +75,35 @@ tty_read() {
     IFS= read -r "$1" < /dev/tty || true
 }
 
+decode_shell_value() {
+    local raw="$1"
+
+    if [[ "$raw" == \'*\' ]]; then
+        printf '%s' "$raw" | sed "s/^'//; s/'$//; s/'\\\\''/'/g"
+    elif [[ "$raw" == \"*\" ]]; then
+        printf '%s' "$raw" | sed 's/^"//; s/"$//; s/\\"/"/g; s/\\\\/\\/g'
+    else
+        printf '%s' "$raw"
+    fi
+}
+
+get_saved_export_value() {
+    local var_name="$1"
+    local file raw
+    local files=("$SHELL_RC" "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile")
+
+    for file in "${files[@]}"; do
+        [ -f "$file" ] || continue
+        raw=$(awk -v target="$var_name" '$0 ~ "^export " target "=" { print substr($0, index($0, "=") + 1) }' "$file" | tail -n 1)
+        if [ -n "$raw" ]; then
+            decode_shell_value "$raw"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 has_shell_block() {
     local marker="$1"
     [ -f "$SHELL_RC" ] && grep -qF "$marker" "$SHELL_RC" 2>/dev/null
@@ -254,18 +283,27 @@ do_set_api() {
 
     echo -e "\n${BLUE}[Step 1/4] Enter API configuration...${NC}"
 
+    local EXISTING_URL EXISTING_TOKEN URL_DEFAULT
     local INPUT_URL=""
     local INPUT_TOKEN=""
+    EXISTING_URL="$(get_saved_export_value OPENAI_BASE_URL || true)"
+    EXISTING_TOKEN="$(get_saved_export_value OPENAI_API_KEY || true)"
+    URL_DEFAULT="${EXISTING_URL:-$DEFAULT_BASE_URL}"
 
-    tty_read INPUT_URL "Enter OPENAI_BASE_URL [${DEFAULT_BASE_URL}]: "
-    : "${INPUT_URL:=$DEFAULT_BASE_URL}"
+    tty_read INPUT_URL "Enter OPENAI_BASE_URL [${URL_DEFAULT}]: "
+    : "${INPUT_URL:=$URL_DEFAULT}"
 
     if [[ "$INPUT_URL" != http://* ]] && [[ "$INPUT_URL" != https://* ]]; then
         INPUT_URL="https://${INPUT_URL}"
         echo -e "${YELLOW}[Auto] Added https:// prefix → ${INPUT_URL}${NC}"
     fi
 
-    tty_read INPUT_TOKEN "Enter OPENAI_API_KEY: "
+    if [ -n "$EXISTING_TOKEN" ]; then
+        tty_read INPUT_TOKEN "Enter OPENAI_API_KEY [Press Enter to keep existing]: "
+        : "${INPUT_TOKEN:=$EXISTING_TOKEN}"
+    else
+        tty_read INPUT_TOKEN "Enter OPENAI_API_KEY: "
+    fi
     if [ -z "$INPUT_TOKEN" ]; then
         echo -e "${RED}[Error] API key cannot be empty.${NC}"
         return 1

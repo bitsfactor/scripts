@@ -71,6 +71,35 @@ tty_read() {
     IFS= read -r "$1" < /dev/tty || true
 }
 
+decode_shell_value() {
+    local raw="$1"
+
+    if [[ "$raw" == \'*\' ]]; then
+        printf '%s' "$raw" | sed "s/^'//; s/'$//; s/'\\\\''/'/g"
+    elif [[ "$raw" == \"*\" ]]; then
+        printf '%s' "$raw" | sed 's/^"//; s/"$//; s/\\"/"/g; s/\\\\/\\/g'
+    else
+        printf '%s' "$raw"
+    fi
+}
+
+get_saved_export_value() {
+    local var_name="$1"
+    local file raw
+    local files=("$SHELL_RC" "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile")
+
+    for file in "${files[@]}"; do
+        [ -f "$file" ] || continue
+        raw=$(awk -v target="$var_name" '$0 ~ "^export " target "=" { print substr($0, index($0, "=") + 1) }' "$file" | tail -n 1)
+        if [ -n "$raw" ]; then
+            decode_shell_value "$raw"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 # sed_inplace: cross-platform sed -i wrapper
 # Args: $1 = sed expression, $2 = file path
 sed_inplace() {
@@ -459,10 +488,13 @@ do_set_api() {
 
     # ---- Prompt for input ----
     echo -e "\n${BLUE}[Step 2/5] Enter API configuration...${NC}"
+    local EXISTING_URL EXISTING_TOKEN URL_DEFAULT
+    EXISTING_URL="$(get_saved_export_value ANTHROPIC_BASE_URL || true)"
+    EXISTING_TOKEN="$(get_saved_export_value ANTHROPIC_AUTH_TOKEN || true)"
+    URL_DEFAULT="${EXISTING_URL:-$DEFAULT_BASE_URL}"
 
-    echo -e "${CYAN}Enter ANTHROPIC_BASE_URL (API endpoint) [${DEFAULT_BASE_URL}]:${NC}"
-    tty_read INPUT_URL
-    : "${INPUT_URL:=$DEFAULT_BASE_URL}"
+    tty_read INPUT_URL "$(printf "${CYAN}Enter ANTHROPIC_BASE_URL (API endpoint) [%s]:${NC} " "$URL_DEFAULT")"
+    : "${INPUT_URL:=$URL_DEFAULT}"
 
     # Auto-prepend https:// if no protocol specified
     if [[ "$INPUT_URL" != http://* ]] && [[ "$INPUT_URL" != https://* ]]; then
@@ -470,8 +502,12 @@ do_set_api() {
         echo -e "${YELLOW}[Auto] Added https:// prefix → ${INPUT_URL}${NC}"
     fi
 
-    echo -e "${CYAN}Enter ANTHROPIC_AUTH_TOKEN (API key):${NC}"
-    tty_read INPUT_TOKEN
+    if [ -n "$EXISTING_TOKEN" ]; then
+        tty_read INPUT_TOKEN "$(printf "${CYAN}Enter ANTHROPIC_AUTH_TOKEN (API key) [Press Enter to keep existing]:${NC} ")"
+        : "${INPUT_TOKEN:=$EXISTING_TOKEN}"
+    else
+        tty_read INPUT_TOKEN "$(printf "${CYAN}Enter ANTHROPIC_AUTH_TOKEN (API key):${NC} ")"
+    fi
 
     if [ -z "$INPUT_TOKEN" ]; then
         echo -e "${RED}[Error] API key cannot be empty.${NC}"
