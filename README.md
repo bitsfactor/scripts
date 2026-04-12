@@ -11,12 +11,12 @@ Use it to:
 
 | Script | What it does | Run |
 | --- | --- | --- |
-| `one.sh` | Full VPS bootstrap with Claude Code or Codex | BFS_VER=1.3.16;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh &#124; BFS_VER=$BFS_VER bash |
-| `env.sh` | Sets system timezone and installs dev tools on macOS / Linux | BFS_VER=1.3.16;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/env.sh &#124; BFS_VER=$BFS_VER bash |
-| `git.sh` | Reuses a GitHub SSH key on a new machine | BFS_VER=1.3.16;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/git.sh &#124; BFS_VER=$BFS_VER bash |
-| `claude.sh` | Installs and configures Claude Code | BFS_VER=1.3.16;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/claude.sh &#124; BFS_VER=$BFS_VER bash |
-| `codex.sh` | Installs Codex, auto-installs `rg`, adds `codex-yolo`, and configures API | BFS_VER=1.3.16;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/codex.sh &#124; BFS_VER=$BFS_VER bash |
-| `pytools.sh` | Installs Python CLI tools into `~/pytools` | BFS_VER=1.3.16;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/pytools.sh &#124; BFS_VER=$BFS_VER bash |
+| `one.sh` | Full VPS bootstrap with Claude Code or Codex | BFS_VER=1.3.17;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/one.sh &#124; BFS_VER=$BFS_VER bash |
+| `env.sh` | Sets system timezone and installs dev tools on macOS / Linux | BFS_VER=1.3.17;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/env.sh &#124; BFS_VER=$BFS_VER bash |
+| `git.sh` | Reuses a GitHub SSH key on a new machine | BFS_VER=1.3.17;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/git.sh &#124; BFS_VER=$BFS_VER bash |
+| `claude.sh` | Installs and configures Claude Code | BFS_VER=1.3.17;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/claude.sh &#124; BFS_VER=$BFS_VER bash |
+| `codex.sh` | Installs Codex, auto-installs `rg`, adds `codex-yolo`, and configures API | BFS_VER=1.3.17;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/codex.sh &#124; BFS_VER=$BFS_VER bash |
+| `pytools.sh` | Installs Python CLI tools into `~/pytools` | BFS_VER=1.3.17;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/pytools.sh &#124; BFS_VER=$BFS_VER bash |
 
 ## Overview
 
