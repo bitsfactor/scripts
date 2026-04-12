@@ -62,8 +62,10 @@ CODEX_CONFIG_FILE="$CODEX_CONFIG_DIR/config.toml"
 CLEAN_VARS=("OPENAI_API_KEY" "OPENAI_BASE_URL")
 BLOCK_START="# >>> BitsFactor codex API"
 BLOCK_END="# <<< BitsFactor codex API"
-FULL_AUTO_BLOCK_START="# >>> BitsFactor codex full-auto"
-FULL_AUTO_BLOCK_END="# <<< BitsFactor codex full-auto"
+YOLO_BLOCK_START="# >>> BitsFactor codex yolo"
+YOLO_BLOCK_END="# <<< BitsFactor codex yolo"
+LEGACY_FULL_AUTO_BLOCK_START="# >>> BitsFactor codex full-auto"
+LEGACY_FULL_AUTO_BLOCK_END="# <<< BitsFactor codex full-auto"
 
 # ---- Shared functions ----
 
@@ -102,11 +104,6 @@ get_saved_export_value() {
     done
 
     return 1
-}
-
-has_shell_block() {
-    local marker="$1"
-    [ -f "$SHELL_RC" ] && grep -qF "$marker" "$SHELL_RC" 2>/dev/null
 }
 
 # sed_inplace: cross-platform sed -i wrapper
@@ -150,6 +147,45 @@ clean_all_shell_configs() {
     clean_shell_config "$HOME/.zshrc"
     clean_shell_config "$HOME/.bashrc"
     clean_shell_config "$HOME/.bash_profile"
+}
+
+clean_codex_alias_config() {
+    local file="$1"
+    if [ ! -f "$file" ]; then
+        return
+    fi
+
+    local cleaned=false
+
+    if grep -qF "$YOLO_BLOCK_START" "$file" 2>/dev/null; then
+        sed_inplace "/$YOLO_BLOCK_START/,/$YOLO_BLOCK_END/d" "$file"
+        cleaned=true
+    fi
+
+    if grep -qF "$LEGACY_FULL_AUTO_BLOCK_START" "$file" 2>/dev/null; then
+        sed_inplace "/$LEGACY_FULL_AUTO_BLOCK_START/,/$LEGACY_FULL_AUTO_BLOCK_END/d" "$file"
+        cleaned=true
+    fi
+
+    if grep -q "^alias codex='command codex --full-auto'$" "$file" 2>/dev/null; then
+        sed_inplace "/^alias codex='command codex --full-auto'$/d" "$file"
+        cleaned=true
+    fi
+
+    if grep -q "^alias codex-yolo='command codex --dangerously-bypass-approvals-and-sandbox'$" "$file" 2>/dev/null; then
+        sed_inplace "/^alias codex-yolo='command codex --dangerously-bypass-approvals-and-sandbox'$/d" "$file"
+        cleaned=true
+    fi
+
+    if [ "$cleaned" = true ]; then
+        echo -e "  ${GREEN}✓${NC} Cleaned Codex aliases in ${file/#$HOME/~}"
+    fi
+}
+
+clean_all_codex_alias_configs() {
+    clean_codex_alias_config "$HOME/.zshrc"
+    clean_codex_alias_config "$HOME/.bashrc"
+    clean_codex_alias_config "$HOME/.bash_profile"
 }
 
 print_source_reminder() {
@@ -219,23 +255,21 @@ ensure_ripgrep() {
     fi
 }
 
-setup_codex_full_auto() {
-    echo -e "\n${BLUE}[Step 4/4] Setting Codex default mode...${NC}"
+setup_codex_yolo_alias() {
+    echo -e "\n${BLUE}[Step 4/4] Setting Codex YOLO alias...${NC}"
 
-    if has_shell_block "$FULL_AUTO_BLOCK_START"; then
-        echo -e "  ${YELLOW}[Skip]${NC} codex full-auto alias already exists in shell config"
-        return 0
-    fi
+    clean_all_codex_alias_configs
 
     touch "$SHELL_RC"
     cat >> "$SHELL_RC" << EOF
 
-${FULL_AUTO_BLOCK_START}
-alias codex='command codex --full-auto'
-${FULL_AUTO_BLOCK_END}
+${YOLO_BLOCK_START}
+alias codex-yolo='command codex --dangerously-bypass-approvals-and-sandbox'
+${YOLO_BLOCK_END}
 EOF
 
-    echo -e "  ${GREEN}✓${NC} Defaulted ${CYAN}codex${NC} to ${CYAN}codex --full-auto${NC}"
+    echo -e "  ${GREEN}✓${NC} Added ${CYAN}codex-yolo${NC} -> ${CYAN}codex --dangerously-bypass-approvals-and-sandbox${NC}"
+    echo -e "  ${GREEN}✓${NC} Left ${CYAN}codex${NC} unchanged"
     echo -e "  ${GREEN}✓${NC} Written to ${SHELL_RC/#$HOME/~}"
 }
 
@@ -261,7 +295,7 @@ do_install_codex() {
     npm i -g @openai/codex || return 1
 
     if command -v codex &> /dev/null; then
-        setup_codex_full_auto || return 1
+        setup_codex_yolo_alias || return 1
 
         echo -e "\n${CYAN}Current version:${NC}"
         codex --version 2>/dev/null || echo -e "${YELLOW}[Warning] Could not retrieve version.${NC}"

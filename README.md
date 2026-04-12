@@ -15,7 +15,7 @@ Use it to:
 | `env.sh` | Sets system timezone and installs dev tools on macOS / Linux | BFS_VER=1.3.16;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/env.sh &#124; BFS_VER=$BFS_VER bash |
 | `git.sh` | Reuses a GitHub SSH key on a new machine | BFS_VER=1.3.16;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/git.sh &#124; BFS_VER=$BFS_VER bash |
 | `claude.sh` | Installs and configures Claude Code | BFS_VER=1.3.16;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/claude.sh &#124; BFS_VER=$BFS_VER bash |
-| `codex.sh` | Installs Codex, auto-installs `rg`, defaults to `--full-auto`, and configures API | BFS_VER=1.3.16;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/codex.sh &#124; BFS_VER=$BFS_VER bash |
+| `codex.sh` | Installs Codex, auto-installs `rg`, adds `codex-yolo`, and configures API | BFS_VER=1.3.16;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/codex.sh &#124; BFS_VER=$BFS_VER bash |
 | `pytools.sh` | Installs Python CLI tools into `~/pytools` | BFS_VER=1.3.16;<br>curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/pytools.sh &#124; BFS_VER=$BFS_VER bash |
 
 ## Overview
@@ -24,5 +24,5 @@ Use it to:
 - `env.sh` — sets system timezone (default `Asia/Shanghai` via `BFS_TIMEZONE`), installs Homebrew (macOS), Git, Python3, Node.js, Go, Docker, and optional SSH port changes on Linux
 - `git.sh` — retrieves and installs your GitHub SSH private key
 - `claude.sh` — installs or updates Claude Code, sets API config, enables Trust All Tools, manages oosp, or uninstalls
-- `codex.sh` — installs Codex, auto-installs `ripgrep` (`rg`) on macOS / Linux, defaults `codex` to `codex --full-auto`, and writes third-party API config
+- `codex.sh` — installs Codex, auto-installs `ripgrep` (`rg`) on macOS / Linux, adds `codex-yolo` for maximum autonomy, and writes third-party API config
 - `pytools.sh` — installs or removes Python CLI tools under `~/pytools`
