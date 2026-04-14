@@ -1039,17 +1039,44 @@ do_install_oosp() {
 }
 
 # =============================================================================
+# Help
+# =============================================================================
+
+print_help() {
+    cat <<EOF
+Claude Code Setup v${VERSION}
+
+Usage:
+  bash claude.sh               # interactive menu
+  bash claude.sh <command>
+
+Commands:
+  install                      Install or update Claude Code
+  set-api                      Write Anthropic API settings
+  trust-all                    Allow Claude Code to use all tools
+  install-oosp                 Install or update the oosp prompt file
+  uninstall                    Remove Claude Code and related config
+  help                         Show this help
+EOF
+}
+
+# =============================================================================
 # CLI parameter handling — direct subcommand execution
 # =============================================================================
 
 if [ $# -gt 0 ]; then
     case "$1" in
+        help|-h|--help) print_help ;;
         install)      do_install ;;
         set-api)      do_set_api ;;
         trust-all)    do_trust_all ;;
         install-oosp) do_install_oosp ;;
         uninstall)    do_uninstall ;;
-        *) echo -e "${RED}[Error] Unknown command: $1${NC}"; exit 1 ;;
+        *)
+            echo -e "${RED}[Error] Unknown command: $1${NC}"
+            print_help
+            exit 1
+            ;;
     esac
     exit 0
 fi

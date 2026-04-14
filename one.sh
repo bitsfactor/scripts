@@ -7,6 +7,7 @@
 #
 # Usage:
 #   bash one.sh
+#   bash one.sh --help
 # =============================================================================
 
 set -e
@@ -83,6 +84,32 @@ reload_shell_rc() {
     echo -e "\n${BLUE}[Info] Reloading ${rc_display} for later steps...${NC}"
     . "$SHELL_RC" || true
 }
+
+print_help() {
+    cat <<EOF
+BitsFactor One-Click VPS Setup v${VERSION}
+
+Usage:
+  bash one.sh
+
+This script runs the guided VPS bootstrap flow and lets you choose
+between Claude Code and Codex during setup.
+EOF
+}
+
+if [ $# -gt 0 ]; then
+    case "$1" in
+        help|-h|--help)
+            print_help
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}[Error] Unknown command: $1${NC}"
+            print_help
+            exit 1
+            ;;
+    esac
+fi
 
 # =============================================================================
 # Download phase — fetch scripts to temp directory

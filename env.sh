@@ -710,11 +710,38 @@ do_install_all() {
 }
 
 # =============================================================================
+# Help
+# =============================================================================
+
+print_help() {
+    cat <<EOF
+BitsFactor Environment Setup v${VERSION}
+
+Usage:
+  bash env.sh                 # interactive menu
+  bash env.sh <command> [arg]
+
+Commands:
+  install-all                 Install the common toolchain
+  set-timezone <tz>           Update system timezone
+  install-brew                Install Homebrew (macOS)
+  install-git                 Install Git
+  install-python              Install Python 3 and venv support
+  install-node                Install Node.js and npm
+  install-go                  Install the Go toolchain
+  install-docker              Install Docker
+  ssh-port [port]             Change SSH port on Linux
+  help                        Show this help
+EOF
+}
+
+# =============================================================================
 # CLI parameter handling — direct subcommand execution
 # =============================================================================
 
 if [ $# -gt 0 ]; then
     case "$1" in
+        help|-h|--help) print_help ;;
         install-all)    do_install_all ;;
         set-timezone)   do_set_timezone "${2:-}" ;;
         install-brew)   do_install_brew ;;
@@ -724,7 +751,11 @@ if [ $# -gt 0 ]; then
         install-go)     do_install_go ;;
         install-docker) do_install_docker ;;
         ssh-port)       do_change_ssh_port "${2:-}" ;;
-        *) echo -e "${RED}[Error] Unknown command: $1${NC}"; exit 1 ;;
+        *)
+            echo -e "${RED}[Error] Unknown command: $1${NC}"
+            print_help
+            exit 1
+            ;;
     esac
     exit 0
 fi

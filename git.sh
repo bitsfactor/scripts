@@ -280,14 +280,38 @@ do_set_key() {
 }
 
 # =============================================================================
+# Help
+# =============================================================================
+
+print_help() {
+    cat <<EOF
+BitsFactor Git SSH Key Manager v${VERSION}
+
+Usage:
+  bash git.sh               # interactive menu
+  bash git.sh <command>
+
+Commands:
+  get-key                   Inspect or generate local SSH keys
+  set-key                   Install a private key on this machine
+  help                      Show this help
+EOF
+}
+
+# =============================================================================
 # CLI parameter handling — direct subcommand execution
 # =============================================================================
 
 if [ $# -gt 0 ]; then
     case "$1" in
+        help|-h|--help) print_help ;;
         get-key) do_get_key ;;
         set-key) do_set_key ;;
-        *) echo -e "${RED}[Error] Unknown command: $1${NC}"; exit 1 ;;
+        *)
+            echo -e "${RED}[Error] Unknown command: $1${NC}"
+            print_help
+            exit 1
+            ;;
     esac
     exit 0
 fi

@@ -413,14 +413,38 @@ EOF
 }
 
 # =============================================================================
+# Help
+# =============================================================================
+
+print_help() {
+    cat <<EOF
+BitsFactor Codex Setup v${VERSION}
+
+Usage:
+  bash codex.sh               # interactive menu
+  bash codex.sh <command>
+
+Commands:
+  install                     Install Codex CLI and helper alias
+  set-api                     Write API settings and ~/.codex/config.toml
+  help                        Show this help
+EOF
+}
+
+# =============================================================================
 # CLI parameter handling — direct subcommand execution
 # =============================================================================
 
 if [ $# -gt 0 ]; then
     case "$1" in
+        help|-h|--help) print_help ;;
         install) do_install_codex ;;
         set-api) do_set_api ;;
-        *) echo -e "${RED}[Error] Unknown command: $1${NC}"; exit 1 ;;
+        *)
+            echo -e "${RED}[Error] Unknown command: $1${NC}"
+            print_help
+            exit 1
+            ;;
     esac
     exit 0
 fi

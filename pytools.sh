@@ -329,14 +329,38 @@ do_uninstall() {
 }
 
 # =============================================================================
+# Help
+# =============================================================================
+
+print_help() {
+    cat <<EOF
+BitsFactor PyTools v${VERSION}
+
+Usage:
+  bash pytools.sh              # interactive menu
+  bash pytools.sh <command>
+
+Commands:
+  install                      Install or update the Python helper tools
+  uninstall                    Remove PyTools and related PATH entries
+  help                         Show this help
+EOF
+}
+
+# =============================================================================
 # CLI parameter handling — direct subcommand execution
 # =============================================================================
 
 if [ $# -gt 0 ]; then
     case "$1" in
+        help|-h|--help) print_help ;;
         install) do_install ;;
         uninstall) do_uninstall ;;
-        *) echo -e "${RED}[Error] Unknown command: $1${NC}"; exit 1 ;;
+        *)
+            echo -e "${RED}[Error] Unknown command: $1${NC}"
+            print_help
+            exit 1
+            ;;
     esac
     exit 0
 fi

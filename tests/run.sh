@@ -198,12 +198,50 @@ case_launcher_dispatch() {
     assert_eq 0 "$status"
 }
 
+case_help_outputs() {
+    local output status
+
+    run_capture output status bash "$TEST_ROOT/bfs.sh" --help
+    assert_eq 0 "$status"
+    assert_contains "$output" "Usage:"
+    assert_contains "$output" "interactive launcher"
+
+    run_capture output status bash "$TEST_ROOT/env.sh" --help
+    assert_eq 0 "$status"
+    assert_contains "$output" "install-all"
+
+    run_capture output status bash "$TEST_ROOT/git.sh" --help
+    assert_eq 0 "$status"
+    assert_contains "$output" "get-key"
+
+    run_capture output status bash "$TEST_ROOT/claude.sh" --help
+    assert_eq 0 "$status"
+    assert_contains "$output" "install-oosp"
+
+    run_capture output status bash "$TEST_ROOT/codex.sh" --help
+    assert_eq 0 "$status"
+    assert_contains "$output" "set-api"
+
+    run_capture output status bash "$TEST_ROOT/pytools.sh" --help
+    assert_eq 0 "$status"
+    assert_contains "$output" "uninstall"
+
+    create_sandbox
+    use_macos
+    run_capture output status env HOME="$HOME" PATH="$PATH" MOCK_LOG="$MOCK_LOG" MOCK_UNAME_S="$MOCK_UNAME_S" MOCK_UNAME_R="$MOCK_UNAME_R" MOCK_UNAME_M="$MOCK_UNAME_M" BFS_TTY_OUT="$BFS_TTY_OUT" REAL_PYTHON3="$REAL_PYTHON3" bash "$TEST_ROOT/one.sh" --help
+    assert_eq 0 "$status"
+    assert_contains "$output" "guided VPS bootstrap"
+    assert_not_contains "$output" "Downloading scripts..."
+    assert_eq "" "$(cat "$MOCK_LOG")" "expected one.sh --help to avoid remote fetches"
+}
+
 run_case "launcher menu renders" case_launcher_menu_renders
 run_case "native Windows fast-fail" case_windows_fast_fail
 run_case "remote latest resolution locks to a tag" case_remote_latest_resolution
 run_case "remote pinned version skips latest lookup" case_remote_pinned_resolution
 run_case "direct script command matrix" case_direct_scripts
 run_case "launcher direct-dispatch matrix" case_launcher_dispatch
+run_case "help outputs" case_help_outputs
 
 echo
 printf 'Passed %s/%s test groups\n' "$pass_count" "$case_count"

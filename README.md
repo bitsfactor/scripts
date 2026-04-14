@@ -51,6 +51,7 @@ Use the menu if you want guidance. Use direct commands if you already know what 
 
 ```bash
 bash bfs.sh
+bash bfs.sh --help
 bash bfs.sh env install-all
 bash bfs.sh codex install
 bash bfs.sh git set-key
