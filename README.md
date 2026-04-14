@@ -18,11 +18,13 @@ It is designed for people who want:
 - [Installation Modes](#installation-modes)
 - [Command Reference](#command-reference)
 - [Repository Layout](#repository-layout)
+- [Project Docs](#project-docs)
 - [Development](#development)
 - [Testing](#testing)
 - [Release Process](#release-process)
 - [Security Notes](#security-notes)
 - [Contributing](#contributing)
+- [License Status](#license-status)
 
 ## Project Status
 
@@ -185,6 +187,13 @@ All legacy script entrypoints remain available. This is useful when:
 └── version.sh      # release version source of truth
 ```
 
+## Project Docs
+
+- [`README.md`](./README.md) — project overview and usage guide
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — contributor workflow and coding/testing expectations
+- [`CHANGELOG.md`](./CHANGELOG.md) — structured project changelog from the current polish pass forward
+- [`SECURITY.md`](./SECURITY.md) — security reporting and sensitive-surface guidance
+
 ## Development
 
 There is no build system. Development is done by editing the scripts directly.
@@ -290,3 +299,9 @@ bash tests/run.sh
 If you change versioned install examples, update both:
 - `version.sh`
 - matching pinned examples in `README.md`
+
+## License Status
+
+This repository does **not** currently include a committed `LICENSE` file.
+
+If you plan to distribute it as a formal open source project, choosing and adding an explicit license should be one of the next steps. Until then, do not assume open source reuse terms that are not written in the repository.
