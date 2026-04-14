@@ -30,14 +30,24 @@ BLUE='\033[34m'
 CYAN='\033[36m'
 NC='\033[0m'
 
+# TTY overrides used by the local test harness
+: "${BFS_TTY_OUT:=/dev/tty}"
+[ -n "${BFS_TTY_INPUT_FILE:-}" ] && exec 9< "$BFS_TTY_INPUT_FILE"
+
 # ---- OS detection ----
 
 OS_TYPE=""
-case "$(uname -s)" in
+UNAME_S="$(uname -s)"
+case "$UNAME_S" in
+    MINGW*|MSYS*|CYGWIN*)
+        echo -e "${RED}[Error] Native Windows shells are not supported.${NC}"
+        echo -e "${YELLOW}Please run this script inside WSL2 Ubuntu on Windows, or use macOS/Linux.${NC}"
+        exit 1
+        ;;
     Darwin*)  OS_TYPE="macos" ;;
     Linux*)   OS_TYPE="linux" ;;
     *)
-        echo -e "${RED}[Error] Unsupported OS: $(uname -s)${NC}"
+        echo -e "${RED}[Error] Unsupported OS: ${UNAME_S}${NC}"
         echo -e "${YELLOW}This script only supports macOS and Linux.${NC}"
         exit 1
         ;;
@@ -74,8 +84,14 @@ BREW_BLOCK_END="# <<< BitsFactor brew shellenv"
 # Args: $1 = variable name to store result
 #       $2 = (optional) prompt string (written directly to /dev/tty)
 tty_read() {
-    [ -n "$2" ] && printf '%s' "$2" > /dev/tty
-    IFS= read -r "$1" < /dev/tty || true
+    if [ -n "$2" ]; then
+        printf '%s' "$2" > "$BFS_TTY_OUT" 2>/dev/null || printf '%s' "$2" >&2
+    fi
+    if [ -n "${BFS_TTY_INPUT_FILE:-}" ]; then
+        IFS= read -r "$1" <&9 || true
+    else
+        IFS= read -r "$1" < /dev/tty || true
+    fi
 }
 
 # has_path_block: check if a PATH block marker already exists in any shell config
@@ -565,7 +581,7 @@ do_change_ssh_port() {
         return 0
     fi
 
-    local SSHD_CONFIG="/etc/ssh/sshd_config"
+    local SSHD_CONFIG="${BFS_SSHD_CONFIG:-/etc/ssh/sshd_config}"
     if [ ! -f "$SSHD_CONFIG" ]; then
         echo -e "${RED}[Error] ${SSHD_CONFIG} not found.${NC}"
         return 1
@@ -618,7 +634,11 @@ do_change_ssh_port() {
     # Modify sshd_config
     echo -e "${BLUE}Setting SSH port to ${NEW_PORT}...${NC}"
     if grep -qE '^#?Port ' "$SSHD_CONFIG"; then
-        $SUDO sed -i "s/^#\?Port .*/Port ${NEW_PORT}/" "$SSHD_CONFIG"
+        if [ -n "$SUDO" ]; then
+            $SUDO sh -c "sed -i.bak 's/^#*Port .*/Port ${NEW_PORT}/' '$SSHD_CONFIG' && rm -f '${SSHD_CONFIG}.bak'"
+        else
+            sed_inplace "s/^#*Port .*/Port ${NEW_PORT}/" "$SSHD_CONFIG"
+        fi
     else
         echo "Port ${NEW_PORT}" | $SUDO tee -a "$SSHD_CONFIG" > /dev/null
     fi
@@ -703,7 +723,7 @@ if [ $# -gt 0 ]; then
         install-node)   do_install_node ;;
         install-go)     do_install_go ;;
         install-docker) do_install_docker ;;
-        ssh-port)       do_change_ssh_port ;;
+        ssh-port)       do_change_ssh_port "${2:-}" ;;
         *) echo -e "${RED}[Error] Unknown command: $1${NC}"; exit 1 ;;
     esac
     exit 0

@@ -27,14 +27,24 @@ BLUE='\033[34m'
 CYAN='\033[36m'
 NC='\033[0m'
 
+# TTY overrides used by the local test harness
+: "${BFS_TTY_OUT:=/dev/tty}"
+[ -n "${BFS_TTY_INPUT_FILE:-}" ] && exec 9< "$BFS_TTY_INPUT_FILE"
+
 # ---- OS detection ----
 
 OS_TYPE=""
-case "$(uname -s)" in
+UNAME_S="$(uname -s)"
+case "$UNAME_S" in
+    MINGW*|MSYS*|CYGWIN*)
+        echo -e "${RED}[Error] Native Windows shells are not supported.${NC}"
+        echo -e "${YELLOW}Please run this script inside WSL2 Ubuntu on Windows, or use macOS/Linux.${NC}"
+        exit 1
+        ;;
     Darwin*)  OS_TYPE="macos" ;;
     Linux*)   OS_TYPE="linux" ;;
     *)
-        echo -e "${RED}[Error] Unsupported OS: $(uname -s)${NC}"
+        echo -e "${RED}[Error] Unsupported OS: ${UNAME_S}${NC}"
         echo -e "${YELLOW}This script only supports macOS and Linux.${NC}"
         exit 1
         ;;
@@ -67,6 +77,20 @@ PYTOOLS_BLOCK_END="# <<< BitsFactor pytools PATH"
 # =============================================================================
 # Shared functions
 # =============================================================================
+
+# tty_read: read one line from /dev/tty or an injected test-input file
+# Args: $1 = variable name to store result
+#       $2 = (optional) prompt string
+tty_read() {
+    if [ -n "$2" ]; then
+        printf '%s' "$2" > "$BFS_TTY_OUT" 2>/dev/null || printf '%s' "$2" >&2
+    fi
+    if [ -n "${BFS_TTY_INPUT_FILE:-}" ]; then
+        IFS= read -r "$1" <&9 || true
+    else
+        IFS= read -r "$1" < /dev/tty || true
+    fi
+}
 
 # has_path_block: check if a PATH block marker already exists in any shell config
 # Args: $1 = block start marker string
@@ -280,7 +304,7 @@ do_uninstall() {
     echo -e "\n${BLUE}=== Uninstall PyTools ===${NC}"
 
     echo -e "\n${YELLOW}[Warning] This will remove ~/pytools/ and PATH config from shell RC files.${NC}"
-    read -p "Continue? (y/n): " CONFIRM < /dev/tty
+    tty_read CONFIRM "Continue? (y/n): "
     if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
         echo -e "${RED}[Cancelled] Operation cancelled.${NC}"
         return
@@ -305,6 +329,19 @@ do_uninstall() {
 }
 
 # =============================================================================
+# CLI parameter handling — direct subcommand execution
+# =============================================================================
+
+if [ $# -gt 0 ]; then
+    case "$1" in
+        install) do_install ;;
+        uninstall) do_uninstall ;;
+        *) echo -e "${RED}[Error] Unknown command: $1${NC}"; exit 1 ;;
+    esac
+    exit 0
+fi
+
+# =============================================================================
 # Entry menu
 # =============================================================================
 
@@ -316,7 +353,7 @@ echo -e "  ${GREEN}1)${NC} Install / Update"
 echo -e "  ${RED}2)${NC} Uninstall"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
-read -p "Enter option (0/1/2): " MENU_CHOICE < /dev/tty
+tty_read MENU_CHOICE "Enter option (0/1/2): "
 
 case "$MENU_CHOICE" in
     1) do_install ;;

@@ -27,14 +27,24 @@ BLUE='\033[34m'
 CYAN='\033[36m'
 NC='\033[0m'
 
+# TTY overrides used by the local test harness
+: "${BFS_TTY_OUT:=/dev/tty}"
+[ -n "${BFS_TTY_INPUT_FILE:-}" ] && exec 9< "$BFS_TTY_INPUT_FILE"
+
 # ---- OS detection ----
 
 OS_TYPE=""
-case "$(uname -s)" in
+UNAME_S="$(uname -s)"
+case "$UNAME_S" in
+    MINGW*|MSYS*|CYGWIN*)
+        echo -e "${RED}[Error] Native Windows shells are not supported.${NC}"
+        echo -e "${YELLOW}Please run this script inside WSL2 Ubuntu on Windows, or use macOS/Linux.${NC}"
+        exit 1
+        ;;
     Darwin*)  OS_TYPE="macos" ;;
     Linux*)   OS_TYPE="linux" ;;
     *)
-        echo -e "${RED}[Error] Unsupported OS: $(uname -s)${NC}"
+        echo -e "${RED}[Error] Unsupported OS: ${UNAME_S}${NC}"
         echo -e "${YELLOW}This script only supports macOS and Linux.${NC}"
         exit 1
         ;;
@@ -67,8 +77,14 @@ BLOCK_END="# <<< Claude Code API"
 # Args: $1 = variable name to store result
 #       $2 = (optional) prompt string (written directly to /dev/tty)
 tty_read() {
-    [ -n "$2" ] && printf '%s' "$2" > /dev/tty
-    IFS= read -r "$1" < /dev/tty || true
+    if [ -n "$2" ]; then
+        printf '%s' "$2" > "$BFS_TTY_OUT" 2>/dev/null || printf '%s' "$2" >&2
+    fi
+    if [ -n "${BFS_TTY_INPUT_FILE:-}" ]; then
+        IFS= read -r "$1" <&9 || true
+    else
+        IFS= read -r "$1" < /dev/tty || true
+    fi
 }
 
 decode_shell_value() {

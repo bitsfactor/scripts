@@ -27,16 +27,35 @@ BLUE='\033[34m'
 CYAN='\033[36m'
 NC='\033[0m'
 
+# TTY overrides used by the local test harness
+: "${BFS_TTY_OUT:=/dev/tty}"
+[ -n "${BFS_TTY_INPUT_FILE:-}" ] && exec 9< "$BFS_TTY_INPUT_FILE"
+
 # tty_read: read one line from /dev/tty
 # Args: $1 = variable name to store result
 #       $2 = (optional) prompt string (written directly to /dev/tty)
 tty_read() {
-    [ -n "$2" ] && printf '%s' "$2" > /dev/tty
-    IFS= read -r "$1" < /dev/tty || true
+    if [ -n "$2" ]; then
+        printf '%s' "$2" > "$BFS_TTY_OUT" 2>/dev/null || printf '%s' "$2" >&2
+    fi
+    if [ -n "${BFS_TTY_INPUT_FILE:-}" ]; then
+        IFS= read -r "$1" <&9 || true
+    else
+        IFS= read -r "$1" < /dev/tty || true
+    fi
 }
 
 # OS detection
-case "$(uname -s | tr '[:upper:]' '[:lower:]')" in
+UNAME_S="$(uname -s)"
+case "$UNAME_S" in
+    MINGW*|MSYS*|CYGWIN*)
+        echo -e "${RED}[Error] Native Windows shells are not supported.${NC}"
+        echo -e "${YELLOW}Please run this script inside WSL2 Ubuntu on Windows, or use macOS/Linux.${NC}"
+        exit 1
+        ;;
+esac
+
+case "$(printf '%s' "$UNAME_S" | tr '[:upper:]' '[:lower:]')" in
     linux*)  IS_LINUX=true ;;
     *)       IS_LINUX=false ;;
 esac
