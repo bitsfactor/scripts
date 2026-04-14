@@ -24,7 +24,7 @@ It is designed for people who want:
 - [Release Process](#release-process)
 - [Security Notes](#security-notes)
 - [Contributing](#contributing)
-- [License Status](#license-status)
+- [License](#license)
 
 ## Project Status
 
@@ -300,8 +300,6 @@ If you change versioned install examples, update both:
 - `version.sh`
 - matching pinned examples in `README.md`
 
-## License Status
+## License
 
-This repository does **not** currently include a committed `LICENSE` file.
-
-If you plan to distribute it as a formal open source project, choosing and adding an explicit license should be one of the next steps. Until then, do not assume open source reuse terms that are not written in the repository.
+This project is licensed under the [MIT License](./LICENSE).
