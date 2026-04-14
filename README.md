@@ -12,39 +12,42 @@ Native PowerShell / Git Bash / MSYS / Cygwin are not supported.
 
 ## Quick Start
 
-### Default entrypoint
+### Open the launcher
 
 ```bash
 curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/bfs.sh | bash
 ```
 
-### Direct command through launcher
+### Run one action directly
 
 ```bash
 curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/bfs.sh | bash -s -- codex install
 ```
 
-### Pinned release
+### Pin a release
 
 ```bash
 BFS_VER=1.3.18
 curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/bfs.sh | BFS_VER=$BFS_VER bash
 ```
 
-## Scripts
+## `bfs.sh` Menu
 
-| Script | Purpose |
-| --- | --- |
-| `bfs.sh` | Unified launcher |
-| `one.sh` | Guided VPS bootstrap |
-| `env.sh` | System timezone and development tools |
-| `git.sh` | Git / SSH key setup |
-| `claude.sh` | Claude Code install and config |
-| `codex.sh` | Codex install and config |
-| `pytools.sh` | Python helper tools |
-| `version.sh` | Release version source of truth |
+```text
+BitsFactor Unified Launcher v1.3.18
 
-## Local Usage
+1) Environment setup   - timezone, package managers, and dev tools
+2) Git & SSH           - local key retrieval and server key install
+3) Claude Code         - install, configure, trust-all, and oosp
+4) Codex               - install and configure Codex CLI
+5) PyTools             - manage the bundled Python helper scripts
+6) VPS bootstrap       - run the guided end-to-end server setup
+0) Exit
+```
+
+Use the menu if you want guidance. Use direct commands if you already know what you want.
+
+## Direct Usage
 
 ```bash
 bash bfs.sh
@@ -52,6 +55,16 @@ bash bfs.sh env install-all
 bash bfs.sh codex install
 bash bfs.sh git set-key
 ```
+
+## Script Map
+
+- `bfs.sh` — unified launcher
+- `one.sh` — guided VPS bootstrap
+- `env.sh` — timezone and common dev tools
+- `git.sh` — Git / SSH key setup
+- `claude.sh` — Claude Code install and config
+- `codex.sh` — Codex install and config
+- `pytools.sh` — bundled Python helper tools
 
 ## Verification
 
@@ -64,17 +77,8 @@ bash tests/run.sh
 
 ## Release
 
-When releasing:
-1. bump `version.sh`
-2. keep pinned examples in `README.md` in sync
-3. commit
-4. tag
-5. push branch and tag
-
-Example:
-
 ```bash
-VER="$(cut -d= -f2 version.sh | tr -d '"')"
+VER="$(cut -d= -f2 version.sh | tr -d '\"')"
 
 git add -A
 git commit -m "chore: release $VER"
@@ -83,7 +87,7 @@ git push origin main
 git push origin "v$VER"
 ```
 
-## Other Docs
+## Docs
 
 - [LICENSE](./LICENSE)
 - [CHANGELOG](./CHANGELOG.md)
