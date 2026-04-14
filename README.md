@@ -27,14 +27,14 @@ curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@main/bfs.sh | bash 
 ### Pin a release
 
 ```bash
-BFS_VER=1.3.18
+BFS_VER=1.3.19
 curl -fsSL https://fastly.jsdelivr.net/gh/bitsfactor/scripts@v$BFS_VER/bfs.sh | BFS_VER=$BFS_VER bash
 ```
 
 ## `bfs.sh` Menu
 
 ```text
-BitsFactor Unified Launcher v1.3.18
+BitsFactor Unified Launcher v1.3.19
 
 1) Environment setup   - timezone, package managers, and dev tools
 2) Git & SSH           - local key retrieval and server key install

@@ -8,7 +8,7 @@
 # Usage:
 #   bash bfs.sh
 #   bash bfs.sh env install-all
-#   BFS_VER=1.3.18 bash bfs.sh codex install
+#   BFS_VER=1.3.19 bash bfs.sh codex install
 # =============================================================================
 
 set -e
@@ -175,7 +175,7 @@ Groups:
 Examples:
   bash bfs.sh env install-all
   bash bfs.sh codex set-api
-  BFS_VER=1.3.18 bash bfs.sh claude install
+  BFS_VER=1.3.19 bash bfs.sh claude install
 EOF2
 }
 
