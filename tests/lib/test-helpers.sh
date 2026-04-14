@@ -75,6 +75,15 @@ MOCK
 echo "Docker version 26.0.0"
 MOCK
 
+    cat > "$dir/rg" <<'MOCK'
+#!/bin/bash
+if [ "$1" = "--version" ]; then
+    echo "ripgrep 14.1.0"
+    exit 0
+fi
+exit 0
+MOCK
+
     cat > "$dir/git" <<'MOCK'
 #!/bin/bash
 if [ "$1" = "config" ] && [ "$2" = "--global" ] && [ "$3" = "user.name" ] && [ -z "$4" ]; then
