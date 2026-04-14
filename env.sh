@@ -739,21 +739,21 @@ echo -e "Shell config:  ${CYAN}${SHELL_RC/#$HOME/~}${NC}\n"
 
 echo -e "${CYAN}Select an option:${NC}"
 if [ "$OS_TYPE" = "macos" ]; then
-    echo -e "  ${GREEN}1)${NC} Install All  (Timezone + Brew + Git + Python3 + Node.js + Go + Docker)"
+    echo -e "  ${GREEN}1)${NC} Install All          - timezone, Brew, Git, Python, Node, Go, Docker"
 else
-    echo -e "  ${GREEN}1)${NC} Install All  (Timezone + Git + Python3 + Node.js + Go + Docker; optionally change SSH Port)"
+    echo -e "  ${GREEN}1)${NC} Install All          - timezone, Git, Python, Node, Go, Docker, then optional SSH port"
 fi
-echo -e "  ${GREEN}2)${NC} Set System Timezone  ${YELLOW}[default: ${BFS_TIMEZONE}]${NC}"
-echo -e "  ${GREEN}3)${NC} Install Homebrew  ${YELLOW}[macOS only]${NC}"
-echo -e "  ${GREEN}4)${NC} Install Git"
-echo -e "  ${GREEN}5)${NC} Install Python3"
-echo -e "  ${GREEN}6)${NC} Install Node.js & npm"
-echo -e "  ${GREEN}7)${NC} Install Go"
-echo -e "  ${GREEN}8)${NC} Install Docker"
-echo -e "  ${GREEN}9)${NC} Change SSH Port  ${YELLOW}[Linux only, asks before changing]${NC}"
+echo -e "  ${GREEN}2)${NC} Set System Timezone  - update the system timezone ${YELLOW}[default: ${BFS_TIMEZONE}]${NC}"
+echo -e "  ${GREEN}3)${NC} Install Homebrew     - install Homebrew ${YELLOW}[macOS only]${NC}"
+echo -e "  ${GREEN}4)${NC} Install Git          - install Git"
+echo -e "  ${GREEN}5)${NC} Install Python3      - install Python 3 and venv support"
+echo -e "  ${GREEN}6)${NC} Install Node.js      - install Node.js and npm"
+echo -e "  ${GREEN}7)${NC} Install Go           - install the Go toolchain"
+echo -e "  ${GREEN}8)${NC} Install Docker       - install Docker"
+echo -e "  ${GREEN}9)${NC} Change SSH Port      - update SSH from the default Linux port ${YELLOW}[Linux only]${NC}"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
-read -p "Enter option (0-9): " MENU_CHOICE < /dev/tty
+tty_read MENU_CHOICE "Enter option (0-9): "
 
 case "$MENU_CHOICE" in
     1) do_install_all ;;

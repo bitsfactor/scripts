@@ -299,8 +299,8 @@ fi
 echo -e "${BLUE}=== Git SSH Key Manager v${VERSION} ===${NC}\n"
 
 echo -e "${CYAN}Select an option:${NC}"
-echo -e "  ${GREEN}1)${NC} Retrieve Keys (local machine)"
-echo -e "  ${GREEN}2)${NC} Set Key (remote server / Mac)"
+echo -e "  ${GREEN}1)${NC} Retrieve Keys       - inspect or generate local SSH keys"
+echo -e "  ${GREEN}2)${NC} Set Key             - install a private key on this machine"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
 stty sane < /dev/tty 2>/dev/null || true

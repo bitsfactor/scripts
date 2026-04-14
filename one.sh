@@ -121,8 +121,8 @@ echo ""
 AI_CHOICE=""
 while :; do
     echo -e "${CYAN}Choose AI assistant to install:${NC}"
-    echo -e "  ${GREEN}1)${NC} Claude Code"
-    echo -e "  ${GREEN}2)${NC} Codex"
+    echo -e "  ${GREEN}1)${NC} Claude Code        - install Claude Code and configure its API"
+    echo -e "  ${GREEN}2)${NC} Codex              - install Codex CLI and configure its API"
     tty_read AI_OPTION "Enter option (1-2): "
     case "$AI_OPTION" in
         1) AI_CHOICE="claude"; break ;;

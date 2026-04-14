@@ -225,15 +225,15 @@ run_group_action() {
 
 run_env_menu() {
     echo -e "${CYAN}Environment Setup${NC}"
-    echo -e "  ${GREEN}1)${NC} Install all"
-    echo -e "  ${GREEN}2)${NC} Set timezone"
-    echo -e "  ${GREEN}3)${NC} Install Homebrew"
-    echo -e "  ${GREEN}4)${NC} Install Git"
-    echo -e "  ${GREEN}5)${NC} Install Python3"
-    echo -e "  ${GREEN}6)${NC} Install Node.js & npm"
-    echo -e "  ${GREEN}7)${NC} Install Go"
-    echo -e "  ${GREEN}8)${NC} Install Docker"
-    echo -e "  ${GREEN}9)${NC} Change SSH port"
+    echo -e "  ${GREEN}1)${NC} Install all          - set timezone and install the common toolchain"
+    echo -e "  ${GREEN}2)${NC} Set timezone         - update the system timezone"
+    echo -e "  ${GREEN}3)${NC} Install Homebrew    - install Homebrew on macOS"
+    echo -e "  ${GREEN}4)${NC} Install Git         - install Git"
+    echo -e "  ${GREEN}5)${NC} Install Python3     - install Python 3 and venv support"
+    echo -e "  ${GREEN}6)${NC} Install Node.js      - install Node.js and npm"
+    echo -e "  ${GREEN}7)${NC} Install Go          - install the Go toolchain"
+    echo -e "  ${GREEN}8)${NC} Install Docker      - install Docker"
+    echo -e "  ${GREEN}9)${NC} Change SSH port     - update SSH from the default Linux port"
     echo -e "  ${RED}0)${NC} Back"
     tty_read choice "Enter option (0-9): "
     case "$choice" in
@@ -253,8 +253,8 @@ run_env_menu() {
 
 run_git_menu() {
     echo -e "${CYAN}Git & SSH${NC}"
-    echo -e "  ${GREEN}1)${NC} Retrieve keys"
-    echo -e "  ${GREEN}2)${NC} Set key"
+    echo -e "  ${GREEN}1)${NC} Retrieve keys        - inspect or generate local SSH keys"
+    echo -e "  ${GREEN}2)${NC} Set key              - install a private key on this machine"
     echo -e "  ${RED}0)${NC} Back"
     tty_read choice "Enter option (0/1/2): "
     case "$choice" in
@@ -267,11 +267,11 @@ run_git_menu() {
 
 run_claude_menu() {
     echo -e "${CYAN}Claude Code${NC}"
-    echo -e "  ${GREEN}1)${NC} Install / Update"
-    echo -e "  ${GREEN}2)${NC} Configure API"
-    echo -e "  ${GREEN}3)${NC} Trust All Tools"
-    echo -e "  ${GREEN}4)${NC} Install / Update oosp"
-    echo -e "  ${RED}5)${NC} Uninstall"
+    echo -e "  ${GREEN}1)${NC} Install / Update    - install or upgrade Claude Code"
+    echo -e "  ${GREEN}2)${NC} Configure API      - write Anthropic API settings"
+    echo -e "  ${GREEN}3)${NC} Trust All Tools    - allow Claude Code to use all tools"
+    echo -e "  ${GREEN}4)${NC} Install / Update oosp - sync the oosp prompt file"
+    echo -e "  ${RED}5)${NC} Uninstall            - remove Claude Code and related config"
     echo -e "  ${RED}0)${NC} Back"
     tty_read choice "Enter option (0-5): "
     case "$choice" in
@@ -287,8 +287,8 @@ run_claude_menu() {
 
 run_codex_menu() {
     echo -e "${CYAN}Codex${NC}"
-    echo -e "  ${GREEN}1)${NC} Install Codex"
-    echo -e "  ${GREEN}2)${NC} Configure API"
+    echo -e "  ${GREEN}1)${NC} Install Codex       - install Codex CLI and helper alias"
+    echo -e "  ${GREEN}2)${NC} Configure API      - write Codex API settings and config"
     echo -e "  ${RED}0)${NC} Back"
     tty_read choice "Enter option (0-2): "
     case "$choice" in
@@ -301,8 +301,8 @@ run_codex_menu() {
 
 run_pytools_menu() {
     echo -e "${CYAN}PyTools${NC}"
-    echo -e "  ${GREEN}1)${NC} Install / Update"
-    echo -e "  ${RED}2)${NC} Uninstall"
+    echo -e "  ${GREEN}1)${NC} Install / Update    - install the Python helper tools"
+    echo -e "  ${RED}2)${NC} Uninstall            - remove PyTools and PATH entries"
     echo -e "  ${RED}0)${NC} Back"
     tty_read choice "Enter option (0/1/2): "
     case "$choice" in
@@ -315,7 +315,7 @@ run_pytools_menu() {
 
 run_one_menu() {
     echo -e "${CYAN}VPS Bootstrap${NC}"
-    echo -e "  ${GREEN}1)${NC} Run guided one-click setup"
+    echo -e "  ${GREEN}1)${NC} Run guided setup     - bootstrap a VPS with the common flow"
     echo -e "  ${RED}0)${NC} Back"
     tty_read choice "Enter option (0/1): "
     case "$choice" in
@@ -329,13 +329,14 @@ interactive_menu() {
     while :; do
         print_header
         echo -e "${CYAN}Choose a tool:${NC}"
-        echo -e "  ${GREEN}1)${NC} Environment setup"
-        echo -e "  ${GREEN}2)${NC} Git & SSH"
-        echo -e "  ${GREEN}3)${NC} Claude Code"
-        echo -e "  ${GREEN}4)${NC} Codex"
-        echo -e "  ${GREEN}5)${NC} PyTools"
-        echo -e "  ${GREEN}6)${NC} VPS bootstrap"
+        echo -e "  ${GREEN}1)${NC} Environment setup   - timezone, package managers, and dev tools"
+        echo -e "  ${GREEN}2)${NC} Git & SSH           - local key retrieval and server key install"
+        echo -e "  ${GREEN}3)${NC} Claude Code        - install, configure, trust-all, and oosp"
+        echo -e "  ${GREEN}4)${NC} Codex              - install and configure Codex CLI"
+        echo -e "  ${GREEN}5)${NC} PyTools            - manage the bundled Python helper scripts"
+        echo -e "  ${GREEN}6)${NC} VPS bootstrap       - run the guided end-to-end server setup"
         echo -e "  ${RED}0)${NC} Exit"
+        echo -e "${YELLOW}Tip:${NC} You can skip menus with commands like ${CYAN}bash bfs.sh codex install${NC}"
         echo ""
         tty_read menu_choice "Enter option (0-6): "
 
