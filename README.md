@@ -193,6 +193,9 @@ All legacy script entrypoints remain available. This is useful when:
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) — contributor workflow and coding/testing expectations
 - [`CHANGELOG.md`](./CHANGELOG.md) — structured project changelog from the current polish pass forward
 - [`SECURITY.md`](./SECURITY.md) — security reporting and sensitive-surface guidance
+- [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) — behavior expectations for project collaboration
+- [`.github/ISSUE_TEMPLATE/`](./.github/ISSUE_TEMPLATE/) — issue intake templates for bugs and feature requests
+- [`.github/pull_request_template.md`](./.github/pull_request_template.md) — default pull request checklist and validation prompt
 
 ## Development
 
