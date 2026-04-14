@@ -1,5 +1,7 @@
 # BitsFactor Scripts
 
+[![CI](https://github.com/bitsfactor/scripts/actions/workflows/ci.yml/badge.svg)](https://github.com/bitsfactor/scripts/actions/workflows/ci.yml)
+
 BitsFactor Scripts is a Bash-first machine bootstrap toolkit for setting up a fresh development machine or VPS with a small set of focused, versioned scripts.
 
 It is designed for people who want:
@@ -21,6 +23,7 @@ It is designed for people who want:
 - [Project Docs](#project-docs)
 - [Development](#development)
 - [Testing](#testing)
+- [CI](#ci)
 - [Release Process](#release-process)
 - [Security Notes](#security-notes)
 - [Contributing](#contributing)
@@ -196,6 +199,7 @@ All legacy script entrypoints remain available. This is useful when:
 - [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) — behavior expectations for project collaboration
 - [`.github/ISSUE_TEMPLATE/`](./.github/ISSUE_TEMPLATE/) — issue intake templates for bugs and feature requests
 - [`.github/pull_request_template.md`](./.github/pull_request_template.md) — default pull request checklist and validation prompt
+- [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) — GitHub Actions workflow for shell syntax checks and repository tests
 
 ## Development
 
@@ -250,6 +254,16 @@ git diff --check
 ### Current verification limitation
 
 The repository-level automated tests do **not** replace a real end-to-end smoke test inside an actual WSL2 Ubuntu environment. WSL2 is the official Windows support path, so real-environment validation is still recommended when that environment is available.
+
+## CI
+
+This repository includes a minimal GitHub Actions workflow at `.github/workflows/ci.yml`.
+
+It currently runs:
+- shell syntax checks with `bash -n`
+- the repository Bash test harness with `bash tests/run.sh`
+
+The workflow is intentionally small and dependency-light so it reflects the actual project shape instead of simulating a larger build system than the repository needs.
 
 ## Release Process
 

@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  shell-check-and-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show Bash version
+        run: bash --version
+
+      - name: Syntax check shell and test scripts
+        run: |
+          bash -n bfs.sh one.sh env.sh git.sh claude.sh codex.sh pytools.sh \
+            tests/run.sh tests/lib/assert.sh tests/lib/test-helpers.sh
+
+      - name: Run repository test harness
+        run: bash tests/run.sh
