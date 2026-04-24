@@ -135,6 +135,252 @@ write_path_block() {
     echo -e "  ${GREEN}✓${NC} Written PATH block to ${display}"
 }
 
+# sed_inplace: cross-platform sed -i wrapper
+# Args: $1 = sed expression, $2 = file path
+sed_inplace() {
+    if [ "$OS_TYPE" = "macos" ]; then
+        sed -i '' "$1" "$2"
+    else
+        sed -i "$1" "$2"
+    fi
+}
+
+# sshd_set_port_in_file: update or append a Port directive in a config file
+# Args: $1 = sshd_config path, $2 = new port, $3 = optional sudo command
+sshd_set_port_in_file() {
+    local sshd_config="$1"
+    local new_port="$2"
+    local sudo_cmd="${3:-}"
+    local sed_expr="s/^[[:space:]]*#\\{0,1\\}[[:space:]]*Port[[:space:]].*/Port ${new_port}/"
+
+    if grep -qE '^[[:space:]]*#?[[:space:]]*Port[[:space:]]+' "$sshd_config"; then
+        if [ -n "$sudo_cmd" ]; then
+            $sudo_cmd sh -c "sed -i.bak '$sed_expr' '$sshd_config' && rm -f '${sshd_config}.bak'"
+        else
+            sed_inplace "$sed_expr" "$sshd_config"
+        fi
+    else
+        printf 'Port %s\n' "$new_port" | $sudo_cmd tee -a "$sshd_config" > /dev/null
+    fi
+}
+
+# sshd_has_seen_config: track recursive Include traversal safely
+# Args: $1 = config path
+sshd_has_seen_config() {
+    case "
+${SSHD_SEEN_CONFIGS:-}
+" in
+        *"
+$1
+"*) return 0 ;;
+    esac
+    return 1
+}
+
+# sshd_strip_quotes: trim one layer of matching shell quotes
+# Args: $1 = raw token
+sshd_strip_quotes() {
+    local value="$1"
+    case "$value" in
+        \"*\") value="${value#\"}"; value="${value%\"}" ;;
+        \'*\') value="${value#\'}"; value="${value%\'}" ;;
+    esac
+    printf '%s\n' "$value"
+}
+
+# sshd_resolve_include_pattern: resolve sshd Include paths like sshd(8)
+# Relative include paths are always anchored at /etc/ssh.
+# Args: $1 = include token
+sshd_resolve_include_pattern() {
+    local include_pattern="$1"
+
+    include_pattern="$(sshd_strip_quotes "$include_pattern")"
+    case "$include_pattern" in
+        /*) printf '%s\n' "$include_pattern" ;;
+        *)  printf '/etc/ssh/%s\n' "$include_pattern" ;;
+    esac
+}
+
+# sshd_list_config_files: print sshd_config and recursively included files
+# Args: $1 = sshd_config path
+sshd_list_config_files() {
+    local sshd_config="$1"
+    local line=""
+    local include_args=""
+    local include_pattern=""
+    local resolved_pattern=""
+    local include_matches=()
+    local include_file=""
+
+    [ -f "$sshd_config" ] || return 0
+    if sshd_has_seen_config "$sshd_config"; then
+        return 0
+    fi
+    SSHD_SEEN_CONFIGS="${SSHD_SEEN_CONFIGS:-}
+$sshd_config"
+
+    printf '%s\n' "$sshd_config"
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line%%#*}"
+        [[ "$line" =~ [^[:space:]] ]] || continue
+        [[ "$line" =~ ^[[:space:]]*Match[[:space:]]+ ]] && break
+        [[ "$line" =~ ^[[:space:]]*Include[[:space:]]+ ]] || continue
+
+        include_args="$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*Include[[:space:]]+//')"
+        read -r -a include_matches <<< "$include_args"
+        for include_pattern in "${include_matches[@]}"; do
+            resolved_pattern="$(sshd_resolve_include_pattern "$include_pattern")"
+            shopt -s nullglob
+            include_matches=( $resolved_pattern )
+            shopt -u nullglob
+            for include_file in "${include_matches[@]}"; do
+                sshd_list_config_files "$include_file"
+            done
+        done
+    done < "$sshd_config"
+}
+
+# sshd_get_configured_ports_fallback: parse explicit Port directives without sshd
+# Args: $1 = sshd_config path
+sshd_get_configured_ports_fallback() {
+    local sshd_config="$1"
+    local file=""
+    local line=""
+
+    SSHD_SEEN_CONFIGS=""
+    while IFS= read -r file; do
+        while IFS= read -r line || [ -n "$line" ]; do
+            line="${line%%#*}"
+            [[ "$line" =~ [^[:space:]] ]] || continue
+            [[ "$line" =~ ^[[:space:]]*Match[[:space:]]+ ]] && break
+            if [[ "$line" =~ ^[[:space:]]*Port[[:space:]]+([0-9]+)([[:space:]]+.*)?$ ]]; then
+                printf '%s\n' "${BASH_REMATCH[1]}"
+            fi
+        done < "$file"
+    done < <(sshd_list_config_files "$sshd_config")
+}
+
+# sshd_get_configured_ports: list all configured SSH ports after Include expansion
+# Args: $1 = sshd_config path
+sshd_get_configured_ports() {
+    local sshd_config="$1"
+
+    if command -v sshd &> /dev/null; then
+        sshd -T -f "$sshd_config" 2>/dev/null | awk '/^port / { print $2 }' | awk '!seen[$0]++'
+    else
+        sshd_get_configured_ports_fallback "$sshd_config" | awk '!seen[$0]++'
+    fi
+}
+
+# sshd_remove_legacy_port_dropin: remove the old BitsFactor Port drop-in if present
+# Args: $1 = sshd_config path, $2 = optional sudo command
+sshd_remove_legacy_port_dropin() {
+    local sshd_config="$1"
+    local sudo_cmd="${2:-}"
+    local file=""
+
+    SSHD_SEEN_CONFIGS=""
+    while IFS= read -r file; do
+        [ "$(basename "$file")" = "0-bitsfactor-port.conf" ] || continue
+        if [ -n "$sudo_cmd" ]; then
+            $sudo_cmd rm -f "$file" || return 1
+        else
+            rm -f "$file" || return 1
+        fi
+        echo -e "${CYAN}Removed legacy SSH drop-in: ${file}${NC}"
+    done < <(sshd_list_config_files "$sshd_config")
+}
+
+# sshd_replace_port_22_directives: update explicit Port 22 lines across config files
+# Args: $1 = sshd_config path, $2 = new port, $3 = optional sudo command
+sshd_replace_port_22_directives() {
+    local sshd_config="$1"
+    local new_port="$2"
+    local sudo_cmd="${3:-}"
+    local file=""
+    local changed=1
+    local sed_expr="s/^[[:space:]]*Port[[:space:]]\\+22\\([[:space:]]*#.*\\)\\{0,1\\}[[:space:]]*$/Port ${new_port}/"
+
+    SSHD_SEEN_CONFIGS=""
+    while IFS= read -r file; do
+        if ! grep -qE '^[[:space:]]*Port[[:space:]]+22([[:space:]]*#.*)?[[:space:]]*$' "$file"; then
+            continue
+        fi
+        if [ -n "$sudo_cmd" ]; then
+            $sudo_cmd sh -c "sed -i.bak '$sed_expr' '$file' && rm -f '${file}.bak'" || return 1
+        else
+            sed_inplace "$sed_expr" "$file" || return 1
+        fi
+        changed=0
+    done < <(sshd_list_config_files "$sshd_config")
+
+    return "$changed"
+}
+
+# join_lines_csv: join newline-delimited values with ", "
+join_lines_csv() {
+    awk 'NF { if (seen++) printf ", "; printf "%s", $0 } END { if (seen) printf "\n" }'
+}
+
+# sshd_validate_config: syntax-check an sshd config when sshd is available
+# Args: $1 = sshd_config path, $2 = optional sudo command
+sshd_validate_config() {
+    local sshd_config="$1"
+    local sudo_cmd="${2:-}"
+
+    if ! command -v sshd &> /dev/null; then
+        return 0
+    fi
+
+    if [ -n "$sudo_cmd" ]; then
+        $sudo_cmd sshd -t -f "$sshd_config" > /dev/null 2>&1
+    else
+        sshd -t -f "$sshd_config" > /dev/null 2>&1
+    fi
+}
+
+# restart_sshd_service: reload/restart SSH service across init systems
+# Args: $1 = optional sudo command
+restart_sshd_service() {
+    local sudo_cmd="${1:-}"
+    local action unit init_script
+
+    for action in reload restart; do
+        if command -v systemctl &> /dev/null; then
+            for unit in sshd ssh; do
+                if $sudo_cmd systemctl "$action" "$unit" > /dev/null 2>&1; then
+                    return 0
+                fi
+            done
+        fi
+
+        if command -v service &> /dev/null; then
+            for unit in sshd ssh; do
+                if $sudo_cmd service "$unit" "$action" > /dev/null 2>&1; then
+                    return 0
+                fi
+            done
+        fi
+
+        if command -v rc-service &> /dev/null; then
+            for unit in sshd ssh; do
+                if $sudo_cmd rc-service "$unit" "$action" > /dev/null 2>&1; then
+                    return 0
+                fi
+            done
+        fi
+
+        for init_script in /etc/init.d/sshd /etc/init.d/ssh; do
+            if [ -x "$init_script" ] && $sudo_cmd "$init_script" "$action" > /dev/null 2>&1; then
+                return 0
+            fi
+        done
+    done
+
+    return 1
+}
+
 # =============================================================================
 # 1) Set System Timezone
 # =============================================================================
@@ -590,15 +836,27 @@ do_change_ssh_port() {
     local SUDO=""
     [ "$(id -u)" -ne 0 ] && SUDO="sudo"
 
-    # Show current port
-    local CURRENT_PORT
-    CURRENT_PORT=$(awk '/^Port / { port=$2 } END { print port }' "$SSHD_CONFIG" 2>/dev/null)
-    : "${CURRENT_PORT:=22}"
-    echo -e "Current SSH port: ${CYAN}${CURRENT_PORT}${NC}"
+    sshd_remove_legacy_port_dropin "$SSHD_CONFIG" "$SUDO" || return 1
 
-    if [ "$CURRENT_PORT" != "22" ]; then
-        echo -e "${YELLOW}[Skip] SSH port is already ${CURRENT_PORT}, only default port 22 will be changed.${NC}"
+    # Read all configured ports so Include-based layouts and duplicate Port
+    # lines are handled correctly.
+    local CURRENT_PORTS=""
+    local CURRENT_PORTS_DISPLAY=""
+    CURRENT_PORTS="$(sshd_get_configured_ports "$SSHD_CONFIG")"
+    if [ -n "$CURRENT_PORTS" ]; then
+        CURRENT_PORTS_DISPLAY="$(printf '%s\n' "$CURRENT_PORTS" | join_lines_csv)"
+    else
+        CURRENT_PORTS_DISPLAY="22"
+    fi
+    echo -e "Current SSH port(s): ${CYAN}${CURRENT_PORTS_DISPLAY}${NC}"
+
+    if [ -n "$CURRENT_PORTS" ] && ! printf '%s\n' "$CURRENT_PORTS" | grep -qx '22'; then
+        echo -e "${YELLOW}[Skip] SSH is already using non-default port(s): ${CURRENT_PORTS_DISPLAY}.${NC}"
         return 0
+    fi
+
+    if [ -n "$CURRENT_PORTS" ] && printf '%s\n' "$CURRENT_PORTS" | awk '$0 != 22 { found=1 } END { exit found ? 0 : 1 }'; then
+        echo -e "${YELLOW}[Info] SSH already has additional non-default port(s); only Port 22 entries will be changed.${NC}"
     fi
 
     # Ask whether to change the port; use $1 if provided, otherwise prompt interactively
@@ -626,26 +884,37 @@ do_change_ssh_port() {
         return 1
     fi
 
-    if [ "$NEW_PORT" = "$CURRENT_PORT" ]; then
-        echo -e "${YELLOW}[Skip] Port is already ${NEW_PORT}.${NC}"
+    if [ -n "$CURRENT_PORTS" ] && printf '%s\n' "$CURRENT_PORTS" | grep -qx "$NEW_PORT" && ! printf '%s\n' "$CURRENT_PORTS" | grep -qx '22'; then
+        echo -e "${YELLOW}[Skip] Port ${NEW_PORT} is already configured.${NC}"
         return 0
     fi
 
-    # Modify sshd_config
+    # Update every explicit Port 22 directive across the config graph. If the
+    # daemon relies on the implicit default, activate Port in the main file.
     echo -e "${BLUE}Setting SSH port to ${NEW_PORT}...${NC}"
-    if grep -qE '^#?Port ' "$SSHD_CONFIG"; then
-        if [ -n "$SUDO" ]; then
-            $SUDO sh -c "sed -i.bak 's/^#*Port .*/Port ${NEW_PORT}/' '$SSHD_CONFIG' && rm -f '${SSHD_CONFIG}.bak'"
-        else
-            sed_inplace "s/^#*Port .*/Port ${NEW_PORT}/" "$SSHD_CONFIG"
-        fi
-    else
-        echo "Port ${NEW_PORT}" | $SUDO tee -a "$SSHD_CONFIG" > /dev/null
+    if ! sshd_replace_port_22_directives "$SSHD_CONFIG" "$NEW_PORT" "$SUDO"; then
+        sshd_set_port_in_file "$SSHD_CONFIG" "$NEW_PORT" "$SUDO" || return 1
+    fi
+
+    if ! sshd_validate_config "$SSHD_CONFIG" "$SUDO"; then
+        echo -e "${RED}[Error] sshd config validation failed. Please inspect ${SSHD_CONFIG}.${NC}"
+        return 1
+    fi
+
+    local CONFIGURED_PORTS=""
+    CONFIGURED_PORTS="$(sshd_get_configured_ports "$SSHD_CONFIG")"
+    if printf '%s\n' "$CONFIGURED_PORTS" | grep -qx '22'; then
+        echo -e "${RED}[Error] SSH still has Port 22 configured. Please inspect Include files manually.${NC}"
+        return 1
+    fi
+    if ! printf '%s\n' "$CONFIGURED_PORTS" | grep -qx "$NEW_PORT"; then
+        echo -e "${RED}[Error] SSH port ${NEW_PORT} was not found after updating config.${NC}"
+        return 1
     fi
 
     # Restart sshd
     echo -e "${BLUE}Restarting sshd...${NC}"
-    if $SUDO systemctl restart sshd 2>/dev/null || $SUDO systemctl restart ssh 2>/dev/null; then
+    if restart_sshd_service "$SUDO"; then
         echo -e "${GREEN}[Success] SSH port changed to ${NEW_PORT}.${NC}"
     else
         echo -e "${RED}[Error] Failed to restart sshd. Please restart manually.${NC}"

@@ -21,7 +21,7 @@ MOCK
 
     cat > "$dir/id" <<'MOCK'
 #!/bin/bash
-[ "$1" = "-u" ] && { echo 1000; exit 0; }
+[ "$1" = "-u" ] && { echo "${MOCK_ID_U:-1000}"; exit 0; }
 /usr/bin/id "$@"
 MOCK
 
@@ -116,7 +116,101 @@ MOCK
 
     cat > "$dir/systemctl" <<'MOCK'
 #!/bin/bash
-exit 0
+[ -n "$MOCK_LOG" ] && printf 'systemctl %s\n' "$*" >> "$MOCK_LOG"
+exit "${MOCK_SYSTEMCTL_EXIT:-0}"
+MOCK
+
+    cat > "$dir/service" <<'MOCK'
+#!/bin/bash
+[ -n "$MOCK_LOG" ] && printf 'service %s\n' "$*" >> "$MOCK_LOG"
+exit "${MOCK_SERVICE_EXIT:-0}"
+MOCK
+
+    cat > "$dir/rc-service" <<'MOCK'
+#!/bin/bash
+[ -n "$MOCK_LOG" ] && printf 'rc-service %s\n' "$*" >> "$MOCK_LOG"
+exit "${MOCK_RC_SERVICE_EXIT:-0}"
+MOCK
+
+    cat > "$dir/sshd" <<'MOCK'
+#!/bin/bash
+set -e
+
+config_file="/etc/ssh/sshd_config"
+mode=""
+
+resolve_include() {
+    local include_path="$2"
+
+    case "$include_path" in
+        /*) printf '%s\n' "$include_path" ;;
+        *) printf '/etc/ssh/%s\n' "$include_path" ;;
+    esac
+}
+
+emit_ports() {
+    local file="$1"
+    local line="" include_args="" include_pattern="" resolved_pattern=""
+    local include_files=() included_file=""
+
+    [ -f "$file" ] || return 0
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line%%#*}"
+        [[ "$line" =~ [^[:space:]] ]] || continue
+        [[ "$line" =~ ^[[:space:]]*Match[[:space:]]+ ]] && break
+
+        if [[ "$line" =~ ^[[:space:]]*Include[[:space:]]+ ]]; then
+            include_args="$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*Include[[:space:]]+//')"
+            read -r -a include_files <<< "$include_args"
+            for include_pattern in "${include_files[@]}"; do
+                resolved_pattern="$(resolve_include "$file" "$include_pattern")"
+                shopt -s nullglob
+                include_files=( $resolved_pattern )
+                shopt -u nullglob
+                for included_file in "${include_files[@]}"; do
+                    emit_ports "$included_file"
+                done
+            done
+            continue
+        fi
+
+        if [[ "$line" =~ ^[[:space:]]*Port[[:space:]]+([0-9]+)([[:space:]]+.*)?$ ]]; then
+            printf 'port %s\n' "${BASH_REMATCH[1]}"
+        fi
+    done < "$file"
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -T|-t)
+            mode="$1"
+            ;;
+        -f)
+            shift
+            config_file="$1"
+            ;;
+    esac
+    shift || break
+done
+
+case "$mode" in
+    -t)
+        exit 0
+        ;;
+    -T)
+        output="$(emit_ports "$config_file")"
+        if [ -n "$output" ]; then
+            printf '%s\n' "$output"
+        else
+            printf 'port 22\n'
+        fi
+        exit 0
+        ;;
+    *)
+        exit 0
+        ;;
+esac
 MOCK
 
     cat > "$dir/pbcopy" <<'MOCK'
@@ -308,6 +402,10 @@ create_sandbox() {
     export MOCK_UNAME_S="Darwin"
     export MOCK_UNAME_M="x86_64"
     export MOCK_UNAME_R="5.15.0"
+    export MOCK_ID_U="1000"
+    export MOCK_SYSTEMCTL_EXIT="0"
+    export MOCK_SERVICE_EXIT="0"
+    export MOCK_RC_SERVICE_EXIT="0"
     export BFS_TTY_OUT="/dev/null"
     unset BFS_TTY_INPUT_FILE
     mkdir -p "$HOME/.ssh" "$HOME/.claude" "$HOME/.codex" "$SANDBOX/mock-bin"

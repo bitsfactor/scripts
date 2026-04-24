@@ -147,6 +147,58 @@ case_direct_scripts() {
     assert_eq 0 "$status"
 }
 
+case_ssh_port_compatibility() {
+    create_sandbox
+    use_linux
+    export MOCK_ID_U="0"
+    export MOCK_SYSTEMCTL_EXIT="1"
+    export MOCK_SERVICE_EXIT="0"
+
+    local sshd_config="$SANDBOX/sshd_config"
+    local sshd_dropin_dir="$SANDBOX/sshd_config.d"
+    mkdir -p "$sshd_dropin_dir"
+    cat > "$sshd_config" <<EOF
+Include $sshd_dropin_dir/*.conf
+
+#Port 22
+EOF
+    printf 'Port 22\n' > "$sshd_dropin_dir/20-vendor.conf"
+    printf 'Port 46022\n' > "$sshd_dropin_dir/0-bitsfactor-port.conf"
+
+    local output status log_contents
+    run_capture output status env HOME="$HOME" PATH="$PATH" MOCK_LOG="$MOCK_LOG" MOCK_UNAME_S="$MOCK_UNAME_S" MOCK_UNAME_R="$MOCK_UNAME_R" MOCK_UNAME_M="$MOCK_UNAME_M" MOCK_ID_U="$MOCK_ID_U" MOCK_SYSTEMCTL_EXIT="$MOCK_SYSTEMCTL_EXIT" MOCK_SERVICE_EXIT="$MOCK_SERVICE_EXIT" BFS_TTY_OUT="$BFS_TTY_OUT" BFS_SSHD_CONFIG="$sshd_config" REAL_PYTHON3="$REAL_PYTHON3" bash "$TEST_ROOT/env.sh" ssh-port 60101
+    assert_eq 0 "$status"
+    assert_contains "$(cat "$sshd_dropin_dir/20-vendor.conf")" "Port 60101"
+    assert_not_contains "$(cat "$sshd_config")" "Port 60101"
+    test ! -e "$sshd_dropin_dir/0-bitsfactor-port.conf"
+    assert_contains "$output" "Removed legacy SSH drop-in"
+
+    log_contents="$(cat "$MOCK_LOG")"
+    assert_contains "$log_contents" "systemctl reload sshd"
+    assert_contains "$log_contents" "service sshd reload"
+}
+
+case_ssh_port_relative_include_semantics() {
+    create_sandbox
+    use_linux
+
+    local sshd_config="$SANDBOX/sshd_config"
+    local relative_dir="$SANDBOX/sub"
+    mkdir -p "$relative_dir"
+    cat > "$sshd_config" <<'EOF'
+Include sub/*.conf
+
+#Port 22
+EOF
+    printf 'Port 22\n' > "$relative_dir/relative.conf"
+
+    local output status
+    run_capture output status env HOME="$HOME" PATH="$PATH" MOCK_LOG="$MOCK_LOG" MOCK_UNAME_S="$MOCK_UNAME_S" MOCK_UNAME_R="$MOCK_UNAME_R" MOCK_UNAME_M="$MOCK_UNAME_M" BFS_TTY_OUT="$BFS_TTY_OUT" BFS_SSHD_CONFIG="$sshd_config" REAL_PYTHON3="$REAL_PYTHON3" bash "$TEST_ROOT/env.sh" ssh-port 60101
+    assert_eq 0 "$status"
+    assert_contains "$(cat "$sshd_config")" "Port 60101"
+    assert_contains "$(cat "$relative_dir/relative.conf")" "Port 22"
+}
+
 case_launcher_dispatch() {
     assert_success_case "bfs env install-all" macos "" bash "$TEST_ROOT/bfs.sh" env install-all
     assert_success_case "bfs env set-timezone" macos "" bash "$TEST_ROOT/bfs.sh" env set-timezone Asia/Shanghai
@@ -240,6 +292,8 @@ run_case "native Windows fast-fail" case_windows_fast_fail
 run_case "remote latest resolution locks to a tag" case_remote_latest_resolution
 run_case "remote pinned version skips latest lookup" case_remote_pinned_resolution
 run_case "direct script command matrix" case_direct_scripts
+run_case "ssh port compatibility paths" case_ssh_port_compatibility
+run_case "ssh port relative include semantics" case_ssh_port_relative_include_semantics
 run_case "launcher direct-dispatch matrix" case_launcher_dispatch
 run_case "help outputs" case_help_outputs
 
