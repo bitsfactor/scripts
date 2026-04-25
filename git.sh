@@ -59,6 +59,18 @@ ensure_ssh_dir() {
     chmod 700 "$HOME/.ssh"
 }
 
+detect_preferred_public_key() {
+    if [ -f "$HOME/.ssh/id_ed25519.pub" ]; then
+        printf '%s\n' "$HOME/.ssh/id_ed25519.pub"
+    elif [ -f "$HOME/.ssh/id_ed25519" ]; then
+        printf '%s\n' "$HOME/.ssh/id_ed25519"
+    elif [ -f "$HOME/.ssh/id_rsa.pub" ]; then
+        printf '%s\n' "$HOME/.ssh/id_rsa.pub"
+    elif [ -f "$HOME/.ssh/id_rsa" ]; then
+        printf '%s\n' "$HOME/.ssh/id_rsa"
+    fi
+}
+
 # =============================================================================
 # 1) Retrieve Keys — detect or generate SSH key pair, copy to clipboard
 # =============================================================================
@@ -99,10 +111,21 @@ do_get_key() {
         fi
     fi
 
+    local PUBKEY_FILE="${KEY_FILE}.pub"
+    if [ ! -f "$PUBKEY_FILE" ]; then
+        echo -e "${BLUE}Rebuilding the matching public key...${NC}"
+        if ! ssh-keygen -y -f "$KEY_FILE" > "$PUBKEY_FILE" 2>/dev/null; then
+            echo -e "${RED}[Error] Failed to derive the public key from ${KEY_FILE}.${NC}"
+            rm -f "$PUBKEY_FILE"
+            return 1
+        fi
+        chmod 644 "$PUBKEY_FILE"
+    fi
+
     # Print Public Key
     echo -e "\n${CYAN}==================== [ Public Key ] =====================${NC}"
     echo -e "${YELLOW}Purpose: Add to GitHub (Settings -> SSH and GPG keys)${NC}"
-    cat "${KEY_FILE}.pub"
+    cat "$PUBKEY_FILE"
     echo -e "${CYAN}=========================================================${NC}\n"
 
     # Print Private Key
@@ -128,10 +151,64 @@ do_get_key() {
     if [ ${#CLIP_CMD[@]} -gt 0 ]; then
         "${CLIP_CMD[@]}" < "$KEY_FILE"
         echo -e "${GREEN}[Success] Private Key automatically copied to your system clipboard!${NC}"
-        echo -e "Next, log into your VPS and run this script again with option 2). Press Cmd+V (or Ctrl+V) to paste when prompted."
+        echo -e "Next, log into your VPS and run this script again with option 3). Press Cmd+V (or Ctrl+V) to paste when prompted."
     else
         echo -e "${YELLOW}[Warning] No system clipboard tool detected. Please manually copy the Private Key above.${NC}"
     fi
+}
+
+# =============================================================================
+# 1b) Get Public Key — inspect or generate a login public key safely
+# =============================================================================
+
+do_get_pubkey() {
+    echo -e "\n${BLUE}=== Get SSH Public Key ===${NC}\n"
+
+    local KEY_PATH=""
+    local PUBKEY_FILE=""
+    KEY_PATH="$(detect_preferred_public_key)"
+
+    if [ -n "$KEY_PATH" ] && [ -f "$KEY_PATH" ] && [ "${KEY_PATH##*.}" = "pub" ]; then
+        PUBKEY_FILE="$KEY_PATH"
+        echo -e "Found existing public key: ${YELLOW}${PUBKEY_FILE}${NC}"
+    elif [ -n "$KEY_PATH" ] && [ -f "$KEY_PATH" ]; then
+        PUBKEY_FILE="${KEY_PATH}.pub"
+        echo -e "Found private key without .pub file: ${YELLOW}${KEY_PATH}${NC}"
+        echo -e "${BLUE}Rebuilding the matching public key...${NC}"
+        if ! ssh-keygen -y -f "$KEY_PATH" > "$PUBKEY_FILE" 2>/dev/null; then
+            echo -e "${RED}[Error] Failed to derive the public key from ${KEY_PATH}.${NC}"
+            rm -f "$PUBKEY_FILE"
+            return 1
+        fi
+        chmod 644 "$PUBKEY_FILE"
+    else
+        echo -e "${YELLOW}[Notice] No SSH key detected.${NC}"
+        local confirm=""
+        tty_read confirm "Generate a new ed25519 key pair now? (y/N): "
+        case "$confirm" in
+            y|Y|yes|YES)
+                ensure_ssh_dir
+                KEY_PATH="$HOME/.ssh/id_ed25519"
+                PUBKEY_FILE="${KEY_PATH}.pub"
+                echo -e "${BLUE}Generating a new ed25519 key pair...${NC}"
+                if ! ssh-keygen -t ed25519 -C "${USER}@${HOSTNAME}" -f "$KEY_PATH" -N "" > /dev/null 2>&1; then
+                    echo -e "${RED}[Error] Key generation failed.${NC}"
+                    return 1
+                fi
+                echo -e "${YELLOW}[Note] Key generated without a passphrase.${NC}"
+                ;;
+            *)
+                echo -e "${YELLOW}[Skip] Public key retrieval cancelled.${NC}"
+                return 1
+                ;;
+        esac
+    fi
+
+    echo -e "\n${CYAN}==================== [ Public Key ] =====================${NC}"
+    cat "$PUBKEY_FILE"
+    echo -e "${CYAN}=========================================================${NC}\n"
+    echo -e "${GREEN}[Success] Public key ready: ${PUBKEY_FILE}${NC}"
+    echo -e "${YELLOW}Copy the full line above into your server's authorized_keys or the hardening prompt.${NC}"
 }
 
 # =============================================================================
@@ -200,7 +277,7 @@ do_set_key() {
             echo -e "${RED}[Cancelled] Operation cancelled.${NC}"
             rm -f "$TMP_KEY"
             trap - EXIT INT TERM
-            return
+            return 1
         fi
     fi
 
@@ -293,6 +370,7 @@ Usage:
 
 Commands:
   get-key                   Inspect or generate local SSH keys
+  get-pubkey                Inspect or generate only the SSH public key
   set-key                   Install a private key on this machine
   help                      Show this help
 EOF
@@ -306,6 +384,7 @@ if [ $# -gt 0 ]; then
     case "$1" in
         help|-h|--help) print_help ;;
         get-key) do_get_key ;;
+        get-pubkey) do_get_pubkey ;;
         set-key) do_set_key ;;
         *)
             echo -e "${RED}[Error] Unknown command: $1${NC}"
@@ -324,15 +403,17 @@ echo -e "${BLUE}=== Git SSH Key Manager v${VERSION} ===${NC}\n"
 
 echo -e "${CYAN}Select an option:${NC}"
 echo -e "  ${GREEN}1)${NC} Retrieve Keys       - inspect or generate local SSH keys"
-echo -e "  ${GREEN}2)${NC} Set Key             - install a private key on this machine"
+echo -e "  ${GREEN}2)${NC} Get Public Key      - inspect or generate only the SSH public key"
+echo -e "  ${GREEN}3)${NC} Set Key             - install a private key on this machine"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
 stty sane < /dev/tty 2>/dev/null || true
-tty_read MENU_CHOICE "Enter option (0/1/2): "
+tty_read MENU_CHOICE "Enter option (0/1/2/3): "
 
 case "$MENU_CHOICE" in
     1) do_get_key ;;
-    2) do_set_key ;;
+    2) do_get_pubkey ;;
+    3) do_set_key ;;
     0|"")
         echo -e "${YELLOW}Exited.${NC}"
         exit 0

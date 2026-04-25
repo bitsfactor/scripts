@@ -174,6 +174,8 @@ Groups:
 
 Examples:
   bash bfs.sh env install-all
+  bash bfs.sh env harden-server
+  bash bfs.sh git get-pubkey
   bash bfs.sh codex set-api
   BFS_VER=1.3.20 bash bfs.sh claude install
 EOF2
@@ -234,8 +236,9 @@ run_env_menu() {
     echo -e "  ${GREEN}7)${NC} Install Go          - install the Go toolchain"
     echo -e "  ${GREEN}8)${NC} Install Docker      - install Docker"
     echo -e "  ${GREEN}9)${NC} Change SSH port     - update SSH from the default Linux port"
+    echo -e "  ${GREEN}10)${NC} Harden server       - prepare login keys and harden SSH"
     echo -e "  ${RED}0)${NC} Back"
-    tty_read choice "Enter option (0-9): "
+    tty_read choice "Enter option (0-10): "
     case "$choice" in
         1) run_group_action env install-all ;;
         2) run_group_action env set-timezone ;;
@@ -246,6 +249,7 @@ run_env_menu() {
         7) run_group_action env install-go ;;
         8) run_group_action env install-docker ;;
         9) run_group_action env ssh-port ;;
+        10) run_group_action env harden-server ;;
         0|"") return 0 ;;
         *) echo -e "${RED}[Error] Invalid option: ${choice}${NC}" ;;
     esac
@@ -254,12 +258,14 @@ run_env_menu() {
 run_git_menu() {
     echo -e "${CYAN}Git & SSH${NC}"
     echo -e "  ${GREEN}1)${NC} Retrieve keys        - inspect or generate local SSH keys"
-    echo -e "  ${GREEN}2)${NC} Set key              - install a private key on this machine"
+    echo -e "  ${GREEN}2)${NC} Get public key       - inspect or generate only the SSH public key"
+    echo -e "  ${GREEN}3)${NC} Set key              - install a private key on this machine"
     echo -e "  ${RED}0)${NC} Back"
-    tty_read choice "Enter option (0/1/2): "
+    tty_read choice "Enter option (0/1/2/3): "
     case "$choice" in
         1) run_group_action git get-key ;;
-        2) run_group_action git set-key ;;
+        2) run_group_action git get-pubkey ;;
+        3) run_group_action git set-key ;;
         0|"") return 0 ;;
         *) echo -e "${RED}[Error] Invalid option: ${choice}${NC}" ;;
     esac

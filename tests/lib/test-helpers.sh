@@ -22,7 +22,23 @@ MOCK
     cat > "$dir/id" <<'MOCK'
 #!/bin/bash
 [ "$1" = "-u" ] && { echo "${MOCK_ID_U:-1000}"; exit 0; }
+[ "$1" = "-un" ] && { echo "${MOCK_ID_UN:-mock-user}"; exit 0; }
 /usr/bin/id "$@"
+MOCK
+
+    cat > "$dir/getent" <<'MOCK'
+#!/bin/bash
+if [ "$1" = "passwd" ] && [ -n "$2" ] && [ "$2" = "${MOCK_GETENT_USER:-}" ]; then
+    printf '%s:x:%s:%s::%s:/bin/bash\n' "$2" "${MOCK_GETENT_UID:-1000}" "${MOCK_GETENT_GID:-1000}" "${MOCK_GETENT_HOME:-/tmp/mock-home}"
+    exit 0
+fi
+/usr/bin/getent "$@"
+MOCK
+
+    cat > "$dir/chown" <<'MOCK'
+#!/bin/bash
+[ -n "$MOCK_LOG" ] && printf 'chown %s\n' "$*" >> "$MOCK_LOG"
+exit 0
 MOCK
 
     cat > "$dir/sudo" <<'MOCK'
@@ -48,6 +64,7 @@ MOCK
 
     cat > "$dir/apt-get" <<'MOCK'
 #!/bin/bash
+[ -n "$MOCK_LOG" ] && printf 'apt-get %s\n' "$*" >> "$MOCK_LOG"
 exit 0
 MOCK
 
@@ -158,10 +175,10 @@ emit_ports() {
     while IFS= read -r line || [ -n "$line" ]; do
         line="${line%%#*}"
         [[ "$line" =~ [^[:space:]] ]] || continue
-        [[ "$line" =~ ^[[:space:]]*Match[[:space:]]+ ]] && break
+        [[ "$line" =~ ^[[:space:]]*[Mm][Aa][Tt][Cc][Hh][[:space:]]+ ]] && break
 
-        if [[ "$line" =~ ^[[:space:]]*Include[[:space:]]+ ]]; then
-            include_args="$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*Include[[:space:]]+//')"
+        if [[ "$line" =~ ^[[:space:]]*[Ii][Nn][Cc][Ll][Uu][Dd][Ee][[:space:]]+ ]]; then
+            include_args="$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*[Ii][Nn][Cc][Ll][Uu][Dd][Ee][[:space:]]+//')"
             read -r -a include_files <<< "$include_args"
             for include_pattern in "${include_files[@]}"; do
                 resolved_pattern="$(resolve_include "$file" "$include_pattern")"
@@ -175,7 +192,7 @@ emit_ports() {
             continue
         fi
 
-        if [[ "$line" =~ ^[[:space:]]*Port[[:space:]]+([0-9]+)([[:space:]]+.*)?$ ]]; then
+        if [[ "$line" =~ ^[[:space:]]*[Pp][Oo][Rr][Tt][[:space:]]+([0-9]+)([[:space:]]+.*)?$ ]]; then
             printf 'port %s\n' "${BASH_REMATCH[1]}"
         fi
     done < "$file"
@@ -196,9 +213,11 @@ done
 
 case "$mode" in
     -t)
+        [ "${MOCK_SSHD_VALIDATE_EXIT:-0}" = "1" ] && exit 1
         exit 0
         ;;
     -T)
+        [ "${MOCK_SSHD_T_EXIT:-0}" = "1" ] && exit 1
         output="$(emit_ports "$config_file")"
         if [ -n "$output" ]; then
             printf '%s\n' "$output"
@@ -247,6 +266,11 @@ MOCK
 #!/bin/bash
 if [ "$1" = "-F" ]; then
     exit 1
+fi
+if [ "$1" = "-l" ] && [ "$2" = "-f" ]; then
+    grep -qE '^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521) ' "$3" || exit 1
+    echo "256 SHA256:mock-fingerprint mock@bitsfactor (ED25519)"
+    exit 0
 fi
 if [ "$1" = "-y" ] && [ "$2" = "-f" ]; then
     echo "ssh-ed25519 AAAAMOCKPUBLIC mock@bitsfactor"

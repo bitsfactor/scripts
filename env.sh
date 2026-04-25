@@ -151,17 +151,43 @@ sshd_set_port_in_file() {
     local sshd_config="$1"
     local new_port="$2"
     local sudo_cmd="${3:-}"
-    local sed_expr="s/^[[:space:]]*#\\{0,1\\}[[:space:]]*Port[[:space:]].*/Port ${new_port}/"
+    local tmp_file=""
 
-    if grep -qE '^[[:space:]]*#?[[:space:]]*Port[[:space:]]+' "$sshd_config"; then
-        if [ -n "$sudo_cmd" ]; then
-            $sudo_cmd sh -c "sed -i.bak '$sed_expr' '$sshd_config' && rm -f '${sshd_config}.bak'"
-        else
-            sed_inplace "$sed_expr" "$sshd_config"
-        fi
-    else
-        printf 'Port %s\n' "$new_port" | $sudo_cmd tee -a "$sshd_config" > /dev/null
+    tmp_file=$(mktemp) || return 1
+    awk -v new_port="$new_port" '
+        BEGIN {
+            updated=0
+            inserted=0
+            in_match=0
+        }
+        {
+            lower=tolower($0)
+            if (!in_match && lower ~ /^[[:space:]]*match[[:space:]]+/) {
+                if (!updated && !inserted) {
+                    print "Port " new_port
+                    inserted=1
+                }
+                in_match=1
+            }
+            if (!in_match && lower ~ /^[[:space:]]*#?[[:space:]]*port[[:space:]]+/) {
+                print "Port " new_port
+                updated=1
+                next
+            }
+            print
+        }
+        END {
+            if (!updated && !inserted) {
+                print "Port " new_port
+            }
+        }
+    ' "$sshd_config" > "$tmp_file" || { rm -f "$tmp_file"; return 1; }
+
+    if ! write_file_from_tmp "$tmp_file" "$sshd_config" "$sudo_cmd"; then
+        rm -f "$tmp_file"
+        return 1
     fi
+    rm -f "$tmp_file"
 }
 
 # sshd_has_seen_config: track recursive Include traversal safely
@@ -224,10 +250,10 @@ $sshd_config"
     while IFS= read -r line || [ -n "$line" ]; do
         line="${line%%#*}"
         [[ "$line" =~ [^[:space:]] ]] || continue
-        [[ "$line" =~ ^[[:space:]]*Match[[:space:]]+ ]] && break
-        [[ "$line" =~ ^[[:space:]]*Include[[:space:]]+ ]] || continue
+        [[ "$line" =~ ^[[:space:]]*[Mm][Aa][Tt][Cc][Hh][[:space:]]+ ]] && break
+        [[ "$line" =~ ^[[:space:]]*[Ii][Nn][Cc][Ll][Uu][Dd][Ee][[:space:]]+ ]] || continue
 
-        include_args="$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*Include[[:space:]]+//')"
+        include_args="$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*[Ii][Nn][Cc][Ll][Uu][Dd][Ee][[:space:]]+//')"
         read -r -a include_matches <<< "$include_args"
         for include_pattern in "${include_matches[@]}"; do
             resolved_pattern="$(sshd_resolve_include_pattern "$include_pattern")"
@@ -253,8 +279,8 @@ sshd_get_configured_ports_fallback() {
         while IFS= read -r line || [ -n "$line" ]; do
             line="${line%%#*}"
             [[ "$line" =~ [^[:space:]] ]] || continue
-            [[ "$line" =~ ^[[:space:]]*Match[[:space:]]+ ]] && break
-            if [[ "$line" =~ ^[[:space:]]*Port[[:space:]]+([0-9]+)([[:space:]]+.*)?$ ]]; then
+            [[ "$line" =~ ^[[:space:]]*[Mm][Aa][Tt][Cc][Hh][[:space:]]+ ]] && break
+            if [[ "$line" =~ ^[[:space:]]*[Pp][Oo][Rr][Tt][[:space:]]+([0-9]+)([[:space:]]+.*)?$ ]]; then
                 printf '%s\n' "${BASH_REMATCH[1]}"
             fi
         done < "$file"
@@ -265,12 +291,16 @@ sshd_get_configured_ports_fallback() {
 # Args: $1 = sshd_config path
 sshd_get_configured_ports() {
     local sshd_config="$1"
+    local ports=""
 
     if command -v sshd &> /dev/null; then
-        sshd -T -f "$sshd_config" 2>/dev/null | awk '/^port / { print $2 }' | awk '!seen[$0]++'
-    else
-        sshd_get_configured_ports_fallback "$sshd_config" | awk '!seen[$0]++'
+        ports="$(sshd -T -f "$sshd_config" 2>/dev/null | awk '/^port / { print $2 }' | awk '!seen[$0]++')"
     fi
+    if [ -z "$ports" ]; then
+        ports="$(sshd_get_configured_ports_fallback "$sshd_config" | awk '!seen[$0]++')"
+    fi
+
+    printf '%s\n' "$ports"
 }
 
 # sshd_remove_legacy_port_dropin: remove the old BitsFactor Port drop-in if present
@@ -300,11 +330,11 @@ sshd_replace_port_22_directives() {
     local sudo_cmd="${3:-}"
     local file=""
     local changed=1
-    local sed_expr="s/^[[:space:]]*Port[[:space:]]\\+22\\([[:space:]]*#.*\\)\\{0,1\\}[[:space:]]*$/Port ${new_port}/"
+    local sed_expr="s/^[[:space:]]*[Pp][Oo][Rr][Tt][[:space:]]\\+22\\([[:space:]]*#.*\\)\\{0,1\\}[[:space:]]*$/Port ${new_port}/"
 
     SSHD_SEEN_CONFIGS=""
     while IFS= read -r file; do
-        if ! grep -qE '^[[:space:]]*Port[[:space:]]+22([[:space:]]*#.*)?[[:space:]]*$' "$file"; then
+        if ! grep -qE '^[[:space:]]*[Pp][Oo][Rr][Tt][[:space:]]+22([[:space:]]*#.*)?[[:space:]]*$' "$file"; then
             continue
         fi
         if [ -n "$sudo_cmd" ]; then
@@ -379,6 +409,670 @@ restart_sshd_service() {
     done
 
     return 1
+}
+
+sshd_get_directive_value_fallback() {
+    local sshd_config="$1"
+    local directive="$2"
+    local file=""
+    local value=""
+    local file_value=""
+    local directive_lc=""
+
+    directive_lc="$(printf '%s' "$directive" | tr '[:upper:]' '[:lower:]')"
+
+    SSHD_SEEN_CONFIGS=""
+    while IFS= read -r file; do
+        file_value="$(awk -v directive_lc="$directive_lc" '
+            {
+                line=$0
+                sub(/#.*/, "", line)
+                if (line !~ /[^[:space:]]/) {
+                    next
+                }
+                if (tolower(line) ~ /^[[:space:]]*match[[:space:]]+/) {
+                    exit
+                }
+                lower=tolower(line)
+                if (lower ~ "^[[:space:]]*" directive_lc "[[:space:]]+") {
+                    sub(/^[[:space:]]+/, "", line)
+                    split(line, fields, /[[:space:]]+/)
+                    if (length(fields[2]) > 0) {
+                        value=fields[2]
+                    }
+                }
+            }
+            END {
+                if (value != "") {
+                    print value
+                }
+            }
+        ' "$file")"
+        if [ -n "$file_value" ]; then
+            value="$file_value"
+        fi
+    done < <(sshd_list_config_files "$sshd_config")
+
+    printf '%s\n' "$value"
+}
+
+sshd_get_directive_value() {
+    local sshd_config="$1"
+    local directive="$2"
+    local lookup_key="$3"
+    local value=""
+
+    if command -v sshd &> /dev/null; then
+        value="$(sshd -T -f "$sshd_config" 2>/dev/null | awk -v key="$lookup_key" '$1 == key { print $2; exit }')"
+    fi
+    if [ -z "$value" ]; then
+        value="$(sshd_get_directive_value_fallback "$sshd_config" "$directive")"
+    fi
+
+    printf '%s\n' "$value"
+}
+
+sshd_file_has_global_directive() {
+    local file="$1"
+    local directive="$2"
+    local directive_lc=""
+
+    directive_lc="$(printf '%s' "$directive" | tr '[:upper:]' '[:lower:]')"
+
+    awk -v directive_lc="$directive_lc" '
+        tolower($0) ~ /^[[:space:]]*match[[:space:]]+/ { exit }
+        tolower($0) ~ "^[[:space:]]*#?[[:space:]]*" directive_lc "[[:space:]]+" { found=1; exit }
+        END { exit found ? 0 : 1 }
+    ' "$file"
+}
+
+write_file_from_tmp() {
+    local source_file="$1"
+    local destination="$2"
+    local sudo_cmd="${3:-}"
+
+    if [ -n "$sudo_cmd" ]; then
+        $sudo_cmd tee "$destination" < "$source_file" > /dev/null
+    else
+        cat "$source_file" > "$destination"
+    fi
+}
+
+capture_optional_file_snapshot() {
+    local source_file="$1"
+    local sudo_cmd="${2:-}"
+    local snapshot_file=""
+
+    if [ ! -f "$source_file" ]; then
+        return 0
+    fi
+
+    snapshot_file=$(mktemp) || return 1
+    if [ -n "$sudo_cmd" ]; then
+        if ! $sudo_cmd cat "$source_file" > "$snapshot_file"; then
+            rm -f "$snapshot_file"
+            return 1
+        fi
+    else
+        if ! cat "$source_file" > "$snapshot_file"; then
+            rm -f "$snapshot_file"
+            return 1
+        fi
+    fi
+
+    printf '%s\n' "$snapshot_file"
+}
+
+restore_optional_file_snapshot() {
+    local snapshot_file="$1"
+    local destination="$2"
+    local sudo_cmd="${3:-}"
+
+    if [ -n "$snapshot_file" ] && [ -f "$snapshot_file" ]; then
+        write_file_from_tmp "$snapshot_file" "$destination" "$sudo_cmd" || return 1
+    else
+        if [ -n "$sudo_cmd" ]; then
+            $sudo_cmd rm -f "$destination" || return 1
+        else
+            rm -f "$destination" || return 1
+        fi
+    fi
+}
+
+cleanup_optional_file_snapshot() {
+    local snapshot_file="$1"
+
+    [ -n "$snapshot_file" ] && rm -f "$snapshot_file"
+}
+
+sshd_capture_config_snapshot() {
+    local sshd_config="$1"
+    local sudo_cmd="${2:-}"
+    local snapshot_manifest=""
+    local file=""
+    local tmp_copy=""
+
+    snapshot_manifest=$(mktemp) || return 1
+
+    SSHD_SEEN_CONFIGS=""
+    while IFS= read -r file; do
+        tmp_copy=$(mktemp) || { rm -f "$snapshot_manifest"; return 1; }
+        if [ -n "$sudo_cmd" ]; then
+            $sudo_cmd cat "$file" > "$tmp_copy" || { rm -f "$tmp_copy" "$snapshot_manifest"; return 1; }
+        elif ! cat "$file" > "$tmp_copy"; then
+            rm -f "$tmp_copy" "$snapshot_manifest"
+            return 1
+        fi
+        printf '%s\t%s\n' "$file" "$tmp_copy" >> "$snapshot_manifest"
+    done < <(sshd_list_config_files "$sshd_config")
+
+    printf '%s\n' "$snapshot_manifest"
+}
+
+sshd_cleanup_config_snapshot() {
+    local snapshot_manifest="$1"
+    local file=""
+    local tmp_copy=""
+    local tab=""
+
+    [ -n "$snapshot_manifest" ] && [ -f "$snapshot_manifest" ] || return 0
+
+    tab="$(printf '\t')"
+    while IFS="$tab" read -r file tmp_copy || [ -n "$file$tmp_copy" ]; do
+        [ -n "$tmp_copy" ] && rm -f "$tmp_copy"
+    done < "$snapshot_manifest"
+    rm -f "$snapshot_manifest"
+}
+
+sshd_restore_config_snapshot() {
+    local snapshot_manifest="$1"
+    local sudo_cmd="${2:-}"
+    local file=""
+    local tmp_copy=""
+    local tab=""
+
+    [ -n "$snapshot_manifest" ] && [ -f "$snapshot_manifest" ] || return 1
+
+    tab="$(printf '\t')"
+    while IFS="$tab" read -r file tmp_copy || [ -n "$file$tmp_copy" ]; do
+        [ -n "$file" ] && [ -n "$tmp_copy" ] || continue
+        write_file_from_tmp "$tmp_copy" "$file" "$sudo_cmd" || return 1
+    done < "$snapshot_manifest"
+}
+
+sshd_rollback_config_snapshot() {
+    local snapshot_manifest="$1"
+    local sudo_cmd="${2:-}"
+
+    if sshd_restore_config_snapshot "$snapshot_manifest" "$sudo_cmd"; then
+        restart_sshd_service "$sudo_cmd" > /dev/null 2>&1 || true
+        echo -e "${YELLOW}[Rollback] Restored the previous SSH configuration files.${NC}"
+    else
+        echo -e "${RED}[Error] Failed to restore the previous SSH configuration files.${NC}"
+    fi
+    sshd_cleanup_config_snapshot "$snapshot_manifest"
+}
+
+sshd_rewrite_directive_in_file() {
+    local file="$1"
+    local directive="$2"
+    local value="$3"
+    local replace_only="$4"
+    local sudo_cmd="${5:-}"
+    local tmp_file=""
+    local directive_lc=""
+
+    directive_lc="$(printf '%s' "$directive" | tr '[:upper:]' '[:lower:]')"
+
+    tmp_file=$(mktemp)
+    awk -v directive="$directive" -v directive_lc="$directive_lc" -v value="$value" -v replace_only="$replace_only" '
+        BEGIN {
+            updated=0
+            inserted=0
+            in_match=0
+            pattern="^[[:space:]]*#?[[:space:]]*" directive_lc "[[:space:]]+"
+        }
+        {
+            if (!in_match && tolower($0) ~ /^[[:space:]]*match[[:space:]]+/) {
+                if (!replace_only && !updated && !inserted) {
+                    print directive " " value
+                    inserted=1
+                }
+                in_match=1
+            }
+            if (!in_match && tolower($0) ~ pattern) {
+                print directive " " value
+                updated=1
+                next
+            }
+            print
+        }
+        END {
+            if (!replace_only && !updated && !inserted) {
+                print directive " " value
+            }
+        }
+    ' "$file" > "$tmp_file"
+
+    if cmp -s "$file" "$tmp_file"; then
+        rm -f "$tmp_file"
+        return 1
+    fi
+
+    if ! write_file_from_tmp "$tmp_file" "$file" "$sudo_cmd"; then
+        rm -f "$tmp_file"
+        return 2
+    fi
+    rm -f "$tmp_file"
+    return 0
+}
+
+sshd_ensure_directive_value() {
+    local sshd_config="$1"
+    local directive="$2"
+    local value="$3"
+    local sudo_cmd="${4:-}"
+    local file=""
+    local found_any=1
+    local changed_any=1
+    local rc=0
+
+    SSHD_SEEN_CONFIGS=""
+    while IFS= read -r file; do
+        if ! sshd_file_has_global_directive "$file" "$directive"; then
+            continue
+        fi
+        found_any=0
+        sshd_rewrite_directive_in_file "$file" "$directive" "$value" "1" "$sudo_cmd"
+        rc=$?
+        case "$rc" in
+            0) changed_any=0 ;;
+            1) ;;
+            *) return 2 ;;
+        esac
+    done < <(sshd_list_config_files "$sshd_config")
+
+    if [ "$found_any" -ne 0 ]; then
+        sshd_rewrite_directive_in_file "$sshd_config" "$directive" "$value" "0" "$sudo_cmd"
+        rc=$?
+        case "$rc" in
+            0) changed_any=0 ;;
+            1) ;;
+            *) return 2 ;;
+        esac
+    fi
+
+    return "$changed_any"
+}
+
+restart_named_service() {
+    local unit="$1"
+    local sudo_cmd="${2:-}"
+    local action=""
+    local init_script=""
+
+    for action in reload restart; do
+        if command -v systemctl &> /dev/null && $sudo_cmd systemctl "$action" "$unit" > /dev/null 2>&1; then
+            return 0
+        fi
+        if command -v service &> /dev/null && $sudo_cmd service "$unit" "$action" > /dev/null 2>&1; then
+            return 0
+        fi
+        if command -v rc-service &> /dev/null && $sudo_cmd rc-service "$unit" "$action" > /dev/null 2>&1; then
+            return 0
+        fi
+        init_script="/etc/init.d/${unit}"
+        if [ -x "$init_script" ] && $sudo_cmd "$init_script" "$action" > /dev/null 2>&1; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+enable_named_service() {
+    local unit="$1"
+    local sudo_cmd="${2:-}"
+
+    if command -v systemctl &> /dev/null; then
+        $sudo_cmd systemctl enable "$unit" > /dev/null 2>&1 || true
+    fi
+}
+
+confirm_default_no() {
+    local prompt="$1"
+    local answer=""
+
+    tty_read answer "$prompt"
+    case "$answer" in
+        y|Y|yes|YES) return 0 ;;
+        *)           return 1 ;;
+    esac
+}
+
+confirm_default_yes() {
+    local prompt="$1"
+    local answer=""
+
+    tty_read answer "$prompt"
+    case "$answer" in
+        ""|y|Y|yes|YES) return 0 ;;
+        *)              return 1 ;;
+    esac
+}
+
+resolve_login_target_user() {
+    local current_user=""
+
+    if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+        printf '%s\n' "$SUDO_USER"
+    elif [ "$(id -u)" -eq 0 ]; then
+        printf 'root\n'
+    else
+        current_user="$(id -un 2>/dev/null || true)"
+        if [ -n "$current_user" ]; then
+            printf '%s\n' "$current_user"
+        elif [ -n "${USER:-}" ]; then
+            printf '%s\n' "$USER"
+        else
+            printf 'root\n'
+        fi
+    fi
+}
+
+resolve_login_target_home() {
+    local target_user="$1"
+    local target_home=""
+
+    if command -v getent &> /dev/null; then
+        target_home="$(getent passwd "$target_user" 2>/dev/null | cut -d: -f6)"
+    fi
+    if [ -z "$target_home" ]; then
+        target_home="$(awk -F: -v user="$target_user" '$1 == user { print $6; exit }' /etc/passwd 2>/dev/null || true)"
+    fi
+    if [ -z "$target_home" ] && [ -n "${HOME:-}" ]; then
+        target_home="$HOME"
+    fi
+    if [ -z "$target_home" ]; then
+        if [ "$target_user" = "root" ]; then
+            target_home="/root"
+        else
+            target_home="/home/${target_user}"
+        fi
+    fi
+
+    printf '%s\n' "$target_home"
+}
+
+resolve_login_target_group() {
+    local target_user="$1"
+    local target_group=""
+
+    if command -v id &> /dev/null; then
+        target_group="$(id -gn "$target_user" 2>/dev/null || true)"
+    fi
+    if [ -z "$target_group" ] && command -v getent &> /dev/null; then
+        target_group="$(getent passwd "$target_user" 2>/dev/null | cut -d: -f4)"
+    fi
+
+    printf '%s\n' "$target_group"
+}
+
+file_is_nonempty() {
+    [ -s "$1" ]
+}
+
+print_firewall_summary() {
+    local ufw_state=""
+    local firewalld_state=""
+    local input_policy=""
+    local nft_count=""
+
+    if command -v ufw &> /dev/null; then
+        ufw_state="$(ufw status 2>/dev/null | head -1)"
+        [ -z "$ufw_state" ] && ufw_state="installed"
+        echo -e "  ufw: ${CYAN}${ufw_state}${NC}"
+    else
+        echo -e "  ufw: ${YELLOW}not installed${NC}"
+    fi
+
+    if command -v firewall-cmd &> /dev/null; then
+        firewalld_state="$(firewall-cmd --state 2>/dev/null || true)"
+        [ -z "$firewalld_state" ] && firewalld_state="installed"
+        echo -e "  firewalld: ${CYAN}${firewalld_state}${NC}"
+    else
+        echo -e "  firewalld: ${YELLOW}not installed${NC}"
+    fi
+
+    if command -v iptables &> /dev/null; then
+        input_policy="$(iptables -S INPUT 2>/dev/null | awk '/^-P INPUT / { print $3; exit }')"
+        [ -z "$input_policy" ] && input_policy="available"
+        echo -e "  iptables INPUT: ${CYAN}${input_policy}${NC}"
+    else
+        echo -e "  iptables: ${YELLOW}not installed${NC}"
+    fi
+
+    if command -v nft &> /dev/null; then
+        nft_count="$(nft list ruleset 2>/dev/null | awk '/^table / { count++ } END { print count + 0 }')"
+        [ -z "$nft_count" ] && nft_count="available"
+        echo -e "  nftables tables: ${CYAN}${nft_count}${NC}"
+    else
+        echo -e "  nftables: ${YELLOW}not installed${NC}"
+    fi
+}
+
+print_pubkey_guidance() {
+    echo -e "\n${CYAN}How to get your SSH login public key from your local machine:${NC}"
+    echo -e "  1. Existing ed25519 key: ${CYAN}cat ~/.ssh/id_ed25519.pub${NC}"
+    echo -e "  2. Existing RSA key:     ${CYAN}cat ~/.ssh/id_rsa.pub${NC}"
+    echo -e "  3. Generate a new key:   ${CYAN}ssh-keygen -t ed25519 -C \"<your-label>\" -f ~/.ssh/id_ed25519${NC}"
+    echo -e "  4. BitsFactor one-liner: ${CYAN}curl -fsSL ${CDN_BASE}/git.sh | bash -s -- get-pubkey${NC}"
+    echo -e "${YELLOW}Run those commands on your local computer, not on this server.${NC}"
+    echo -e "${YELLOW}Copy the single .pub line, then paste it below.${NC}\n"
+}
+
+validate_public_key_line() {
+    local public_key="$1"
+    local tmp_file=""
+
+    tmp_file=$(mktemp)
+    printf '%s\n' "$public_key" > "$tmp_file"
+    if command -v ssh-keygen &> /dev/null && ssh-keygen -l -f "$tmp_file" > /dev/null 2>&1; then
+        rm -f "$tmp_file"
+        return 0
+    fi
+    rm -f "$tmp_file"
+
+    case "$public_key" in
+        ssh-ed25519\ *|ssh-rsa\ *|ecdsa-sha2-nistp256\ *|ecdsa-sha2-nistp384\ *|ecdsa-sha2-nistp521\ *)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+prepare_target_ssh_dir() {
+    local target_user="$1"
+    local target_ssh_dir="$2"
+    local sudo_cmd="${3:-}"
+    local target_group=""
+
+    target_group="$(resolve_login_target_group "$target_user")"
+
+    if [ -n "$sudo_cmd" ]; then
+        $sudo_cmd mkdir -p "$target_ssh_dir" || return 1
+        $sudo_cmd chmod 700 "$target_ssh_dir" || return 1
+        if [ "$target_user" != "root" ]; then
+            if [ -n "$target_group" ]; then
+                $sudo_cmd chown "$target_user:$target_group" "$target_ssh_dir" 2>/dev/null || $sudo_cmd chown "$target_user" "$target_ssh_dir" 2>/dev/null || true
+            else
+                $sudo_cmd chown "$target_user" "$target_ssh_dir" 2>/dev/null || true
+            fi
+        fi
+    else
+        mkdir -p "$target_ssh_dir" || return 1
+        chmod 700 "$target_ssh_dir" || return 1
+        if [ "$target_user" != "root" ]; then
+            if [ -n "$target_group" ]; then
+                chown "$target_user:$target_group" "$target_ssh_dir" 2>/dev/null || chown "$target_user" "$target_ssh_dir" 2>/dev/null || true
+            else
+                chown "$target_user" "$target_ssh_dir" 2>/dev/null || true
+            fi
+        fi
+    fi
+}
+
+normalize_authorized_key_permissions() {
+    local target_user="$1"
+    local target_ssh_dir="$2"
+    local auth_keys_file="$3"
+    local sudo_cmd="${4:-}"
+    local target_group=""
+
+    target_group="$(resolve_login_target_group "$target_user")"
+    prepare_target_ssh_dir "$target_user" "$target_ssh_dir" "$sudo_cmd" || return 1
+
+    if [ -n "$sudo_cmd" ]; then
+        $sudo_cmd touch "$auth_keys_file" || return 1
+        $sudo_cmd chmod 600 "$auth_keys_file" || return 1
+        if [ "$target_user" != "root" ]; then
+            if [ -n "$target_group" ]; then
+                $sudo_cmd chown "$target_user:$target_group" "$auth_keys_file" 2>/dev/null || $sudo_cmd chown "$target_user" "$auth_keys_file" 2>/dev/null || true
+            else
+                $sudo_cmd chown "$target_user" "$auth_keys_file" 2>/dev/null || true
+            fi
+        fi
+    else
+        touch "$auth_keys_file" || return 1
+        chmod 600 "$auth_keys_file" || return 1
+        if [ "$target_user" != "root" ]; then
+            if [ -n "$target_group" ]; then
+                chown "$target_user:$target_group" "$auth_keys_file" 2>/dev/null || chown "$target_user" "$auth_keys_file" 2>/dev/null || true
+            else
+                chown "$target_user" "$auth_keys_file" 2>/dev/null || true
+            fi
+        fi
+    fi
+}
+
+append_authorized_key() {
+    local target_user="$1"
+    local target_ssh_dir="$2"
+    local auth_keys_file="$3"
+    local public_key="$4"
+    local sudo_cmd="${5:-}"
+    local tmp_file=""
+
+    tmp_file=$(mktemp)
+    if [ -f "$auth_keys_file" ]; then
+        cat "$auth_keys_file" > "$tmp_file"
+    fi
+    if grep -qxF "$public_key" "$tmp_file" 2>/dev/null; then
+        rm -f "$tmp_file"
+        echo -e "${GREEN}[Skip] Public key is already present in ${auth_keys_file}.${NC}"
+        return 0
+    fi
+
+    printf '%s\n' "$public_key" >> "$tmp_file"
+    prepare_target_ssh_dir "$target_user" "$target_ssh_dir" "$sudo_cmd" || { rm -f "$tmp_file"; return 1; }
+    if ! write_file_from_tmp "$tmp_file" "$auth_keys_file" "$sudo_cmd"; then
+        rm -f "$tmp_file"
+        return 1
+    fi
+    rm -f "$tmp_file"
+    normalize_authorized_key_permissions "$target_user" "$target_ssh_dir" "$auth_keys_file" "$sudo_cmd" || return 1
+
+    echo -e "${GREEN}[Success] Public key is ready in ${auth_keys_file}.${NC}"
+}
+
+prepare_login_public_key() {
+    local target_user="$1"
+    local target_home="$2"
+    local auth_keys_file="$3"
+    local sudo_cmd="${4:-}"
+    local target_ssh_dir="${target_home}/.ssh"
+    local public_key=""
+
+    echo -e "\n${BLUE}=== Prepare Login Public Key ===${NC}"
+    echo -e "Target login account: ${CYAN}${target_user}${NC}"
+    echo -e "authorized_keys path: ${CYAN}${auth_keys_file}${NC}"
+
+    if file_is_nonempty "$auth_keys_file"; then
+        echo -e "${GREEN}[Info] authorized_keys already exists and is non-empty.${NC}"
+        if confirm_default_yes "Use the existing authorized_keys and continue? [Y/n]: "; then
+            normalize_authorized_key_permissions "$target_user" "$target_ssh_dir" "$auth_keys_file" "$sudo_cmd" || return 1
+            return 0
+        fi
+        echo -e "${BLUE}Appending one more login public key...${NC}"
+    fi
+
+    print_pubkey_guidance
+    tty_read public_key "Paste one SSH public key line here (leave blank to cancel): "
+    if [ -z "$public_key" ]; then
+        echo -e "${YELLOW}[Skip] Public key setup cancelled.${NC}"
+        return 1
+    fi
+    if ! validate_public_key_line "$public_key"; then
+        echo -e "${RED}[Error] Invalid SSH public key format.${NC}"
+        return 1
+    fi
+
+    append_authorized_key "$target_user" "$target_ssh_dir" "$auth_keys_file" "$public_key" "$sudo_cmd"
+}
+
+apply_sshd_auth_hardening() {
+    local sshd_config="$1"
+    local sudo_cmd="${2:-}"
+    local changed_any=1
+    local rc=0
+    local directive=""
+    local value=""
+    local snapshot_manifest=""
+
+    snapshot_manifest="$(sshd_capture_config_snapshot "$sshd_config" "$sudo_cmd")" || return 1
+
+    while IFS='=' read -r directive value; do
+        if sshd_ensure_directive_value "$sshd_config" "$directive" "$value" "$sudo_cmd"; then
+            rc=0
+        else
+            rc=$?
+        fi
+        case "$rc" in
+            0) changed_any=0 ;;
+            1) ;;
+            *)
+                sshd_rollback_config_snapshot "$snapshot_manifest" "$sudo_cmd"
+                return 1
+                ;;
+        esac
+    done <<'EOF'
+PasswordAuthentication=no
+KbdInteractiveAuthentication=no
+PubkeyAuthentication=yes
+PermitRootLogin=prohibit-password
+EOF
+
+    if [ "$changed_any" -ne 0 ]; then
+        sshd_cleanup_config_snapshot "$snapshot_manifest"
+        echo -e "${GREEN}[Skip] SSH authentication is already hardened.${NC}"
+        return 2
+    fi
+
+    if ! sshd_validate_config "$sshd_config" "$sudo_cmd"; then
+        sshd_rollback_config_snapshot "$snapshot_manifest" "$sudo_cmd"
+        echo -e "${RED}[Error] sshd config validation failed after authentication changes.${NC}"
+        return 1
+    fi
+    if ! restart_sshd_service "$sudo_cmd"; then
+        sshd_rollback_config_snapshot "$snapshot_manifest" "$sudo_cmd"
+        echo -e "${RED}[Error] Failed to restart sshd after authentication changes.${NC}"
+        return 1
+    fi
+
+    sshd_cleanup_config_snapshot "$snapshot_manifest"
+    echo -e "${GREEN}[Success] SSH password login is now disabled; public key login remains enabled.${NC}"
 }
 
 # =============================================================================
@@ -834,9 +1528,15 @@ do_change_ssh_port() {
     fi
 
     local SUDO=""
+    local SNAPSHOT_MANIFEST=""
     [ "$(id -u)" -ne 0 ] && SUDO="sudo"
 
-    sshd_remove_legacy_port_dropin "$SSHD_CONFIG" "$SUDO" || return 1
+    SNAPSHOT_MANIFEST="$(sshd_capture_config_snapshot "$SSHD_CONFIG" "$SUDO")" || return 1
+
+    if ! sshd_remove_legacy_port_dropin "$SSHD_CONFIG" "$SUDO"; then
+        sshd_rollback_config_snapshot "$SNAPSHOT_MANIFEST" "$SUDO"
+        return 1
+    fi
 
     # Read all configured ports so Include-based layouts and duplicate Port
     # lines are handled correctly.
@@ -851,6 +1551,7 @@ do_change_ssh_port() {
     echo -e "Current SSH port(s): ${CYAN}${CURRENT_PORTS_DISPLAY}${NC}"
 
     if [ -n "$CURRENT_PORTS" ] && ! printf '%s\n' "$CURRENT_PORTS" | grep -qx '22'; then
+        sshd_cleanup_config_snapshot "$SNAPSHOT_MANIFEST"
         echo -e "${YELLOW}[Skip] SSH is already using non-default port(s): ${CURRENT_PORTS_DISPLAY}.${NC}"
         return 0
     fi
@@ -869,6 +1570,7 @@ do_change_ssh_port() {
             y|Y|yes|YES)
                 ;;
             *)
+                sshd_cleanup_config_snapshot "$SNAPSHOT_MANIFEST"
                 echo -e "${YELLOW}[Skip] SSH port unchanged.${NC}"
                 return 0
                 ;;
@@ -880,11 +1582,13 @@ do_change_ssh_port() {
 
     # Validate
     if ! [[ "$NEW_PORT" =~ ^[0-9]+$ ]] || [ "$NEW_PORT" -lt 1024 ] || [ "$NEW_PORT" -gt 65535 ]; then
+        sshd_rollback_config_snapshot "$SNAPSHOT_MANIFEST" "$SUDO"
         echo -e "${RED}[Error] Invalid port: ${NEW_PORT}. Must be 1024–65535.${NC}"
         return 1
     fi
 
     if [ -n "$CURRENT_PORTS" ] && printf '%s\n' "$CURRENT_PORTS" | grep -qx "$NEW_PORT" && ! printf '%s\n' "$CURRENT_PORTS" | grep -qx '22'; then
+        sshd_cleanup_config_snapshot "$SNAPSHOT_MANIFEST"
         echo -e "${YELLOW}[Skip] Port ${NEW_PORT} is already configured.${NC}"
         return 0
     fi
@@ -893,10 +1597,14 @@ do_change_ssh_port() {
     # daemon relies on the implicit default, activate Port in the main file.
     echo -e "${BLUE}Setting SSH port to ${NEW_PORT}...${NC}"
     if ! sshd_replace_port_22_directives "$SSHD_CONFIG" "$NEW_PORT" "$SUDO"; then
-        sshd_set_port_in_file "$SSHD_CONFIG" "$NEW_PORT" "$SUDO" || return 1
+        if ! sshd_set_port_in_file "$SSHD_CONFIG" "$NEW_PORT" "$SUDO"; then
+            sshd_rollback_config_snapshot "$SNAPSHOT_MANIFEST" "$SUDO"
+            return 1
+        fi
     fi
 
     if ! sshd_validate_config "$SSHD_CONFIG" "$SUDO"; then
+        sshd_rollback_config_snapshot "$SNAPSHOT_MANIFEST" "$SUDO"
         echo -e "${RED}[Error] sshd config validation failed. Please inspect ${SSHD_CONFIG}.${NC}"
         return 1
     fi
@@ -904,10 +1612,12 @@ do_change_ssh_port() {
     local CONFIGURED_PORTS=""
     CONFIGURED_PORTS="$(sshd_get_configured_ports "$SSHD_CONFIG")"
     if printf '%s\n' "$CONFIGURED_PORTS" | grep -qx '22'; then
+        sshd_rollback_config_snapshot "$SNAPSHOT_MANIFEST" "$SUDO"
         echo -e "${RED}[Error] SSH still has Port 22 configured. Please inspect Include files manually.${NC}"
         return 1
     fi
     if ! printf '%s\n' "$CONFIGURED_PORTS" | grep -qx "$NEW_PORT"; then
+        sshd_rollback_config_snapshot "$SNAPSHOT_MANIFEST" "$SUDO"
         echo -e "${RED}[Error] SSH port ${NEW_PORT} was not found after updating config.${NC}"
         return 1
     fi
@@ -915,8 +1625,10 @@ do_change_ssh_port() {
     # Restart sshd
     echo -e "${BLUE}Restarting sshd...${NC}"
     if restart_sshd_service "$SUDO"; then
+        sshd_cleanup_config_snapshot "$SNAPSHOT_MANIFEST"
         echo -e "${GREEN}[Success] SSH port changed to ${NEW_PORT}.${NC}"
     else
+        sshd_rollback_config_snapshot "$SNAPSHOT_MANIFEST" "$SUDO"
         echo -e "${RED}[Error] Failed to restart sshd. Please restart manually.${NC}"
         return 1
     fi
@@ -924,6 +1636,164 @@ do_change_ssh_port() {
     echo -e "\n${YELLOW}[Important] Before closing this session:${NC}"
     echo -e "  1. Ensure firewall allows port ${NEW_PORT}"
     echo -e "  2. Test new connection: ${CYAN}ssh -p ${NEW_PORT} user@host${NC}"
+}
+
+# =============================================================================
+# 9) Harden Server (Linux only)
+# =============================================================================
+
+do_harden_server() {
+    echo -e "\n${BLUE}=== Harden Server ===${NC}"
+
+    if [ "$OS_TYPE" != "linux" ]; then
+        echo -e "${YELLOW}[Skip] This option is for Linux only.${NC}"
+        return 0
+    fi
+
+    local SSHD_CONFIG="${BFS_SSHD_CONFIG:-/etc/ssh/sshd_config}"
+    if [ ! -f "$SSHD_CONFIG" ]; then
+        echo -e "${RED}[Error] ${SSHD_CONFIG} not found.${NC}"
+        return 1
+    fi
+
+    local SUDO=""
+    [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+
+    local target_user=""
+    local target_home=""
+    local auth_keys_file=""
+    target_user="$(resolve_login_target_user)"
+    target_home="$(resolve_login_target_home "$target_user")"
+    auth_keys_file="${target_home}/.ssh/authorized_keys"
+
+    local current_ports=""
+    local current_ports_display=""
+    local permit_root=""
+    local password_auth=""
+    local kbd_auth=""
+    local pubkey_auth=""
+    current_ports="$(sshd_get_configured_ports "$SSHD_CONFIG")"
+    if [ -n "$current_ports" ]; then
+        current_ports_display="$(printf '%s\n' "$current_ports" | join_lines_csv)"
+    else
+        current_ports="22"
+        current_ports_display="22"
+    fi
+    permit_root="$(sshd_get_directive_value "$SSHD_CONFIG" "PermitRootLogin" "permitrootlogin")"
+    password_auth="$(sshd_get_directive_value "$SSHD_CONFIG" "PasswordAuthentication" "passwordauthentication")"
+    kbd_auth="$(sshd_get_directive_value "$SSHD_CONFIG" "KbdInteractiveAuthentication" "kbdinteractiveauthentication")"
+    pubkey_auth="$(sshd_get_directive_value "$SSHD_CONFIG" "PubkeyAuthentication" "pubkeyauthentication")"
+
+    echo -e "\n${CYAN}Current SSH state:${NC}"
+    echo -e "  SSH port(s): ${CYAN}${current_ports_display}${NC}"
+    echo -e "  PermitRootLogin: ${CYAN}${permit_root:-unknown}${NC}"
+    echo -e "  PasswordAuthentication: ${CYAN}${password_auth:-unknown}${NC}"
+    echo -e "  KbdInteractiveAuthentication: ${CYAN}${kbd_auth:-unknown}${NC}"
+    echo -e "  PubkeyAuthentication: ${CYAN}${pubkey_auth:-unknown}${NC}"
+    echo -e "  Login account target: ${CYAN}${target_user}${NC}"
+    if file_is_nonempty "$auth_keys_file"; then
+        echo -e "  authorized_keys: ${GREEN}present${NC} (${auth_keys_file})"
+    else
+        echo -e "  authorized_keys: ${YELLOW}missing or empty${NC} (${auth_keys_file})"
+    fi
+
+    echo -e "\n${CYAN}Current firewall state:${NC}"
+    print_firewall_summary
+
+    local login_key_ready=0
+    if prepare_login_public_key "$target_user" "$target_home" "$auth_keys_file" "$SUDO"; then
+        login_key_ready=1
+    fi
+
+    local port_status="skipped"
+    local auth_status="skipped"
+    local before_ports=""
+    local after_ports=""
+    local requested_port="${1:-}"
+    local rc=0
+
+    if confirm_default_no "Change the SSH port now? [y/N]: "; then
+        if [ -z "$requested_port" ]; then
+            tty_read requested_port "Enter new SSH port [60101]: "
+            : "${requested_port:=60101}"
+        fi
+        before_ports="$(sshd_get_configured_ports "$SSHD_CONFIG")"
+        [ -z "$before_ports" ] && before_ports="22"
+        if do_change_ssh_port "$requested_port"; then
+            after_ports="$(sshd_get_configured_ports "$SSHD_CONFIG")"
+            [ -z "$after_ports" ] && after_ports="22"
+            if [ "$before_ports" = "$after_ports" ]; then
+                port_status="unchanged"
+            else
+                port_status="updated"
+            fi
+        else
+            port_status="failed"
+        fi
+    fi
+
+    current_ports="$(sshd_get_configured_ports "$SSHD_CONFIG")"
+    [ -z "$current_ports" ] && current_ports="22"
+
+    if [ "$login_key_ready" -eq 1 ]; then
+        if confirm_default_no "Disable SSH password login now? [y/N]: "; then
+            local first_port=""
+            first_port="$(printf '%s\n' "$current_ports" | awk 'NF { print; exit }')"
+            [ -z "$first_port" ] && first_port="22"
+            echo -e "\n${YELLOW}[Important] Open another terminal first and test:${NC}"
+            echo -e "  ${CYAN}ssh -p ${first_port} ${target_user}@host${NC}"
+            if confirm_default_no "Have you tested another SSH login and want to continue? [y/N]: "; then
+                if apply_sshd_auth_hardening "$SSHD_CONFIG" "$SUDO"; then
+                    rc=0
+                else
+                    rc=$?
+                fi
+                case "$rc" in
+                    0) auth_status="hardened" ;;
+                    2) auth_status="unchanged" ;;
+                    *) auth_status="failed" ;;
+                esac
+            else
+                echo -e "${YELLOW}[Skip] SSH password login remains enabled for now.${NC}"
+            fi
+        fi
+    else
+        echo -e "\n${YELLOW}[Skip] SSH password login was not changed because a confirmed login public key is not ready for this run.${NC}"
+    fi
+
+    current_ports="$(sshd_get_configured_ports "$SSHD_CONFIG")"
+    if [ -n "$current_ports" ]; then
+        current_ports_display="$(printf '%s\n' "$current_ports" | join_lines_csv)"
+    else
+        current_ports="22"
+        current_ports_display="22"
+    fi
+    permit_root="$(sshd_get_directive_value "$SSHD_CONFIG" "PermitRootLogin" "permitrootlogin")"
+    password_auth="$(sshd_get_directive_value "$SSHD_CONFIG" "PasswordAuthentication" "passwordauthentication")"
+    kbd_auth="$(sshd_get_directive_value "$SSHD_CONFIG" "KbdInteractiveAuthentication" "kbdinteractiveauthentication")"
+    pubkey_auth="$(sshd_get_directive_value "$SSHD_CONFIG" "PubkeyAuthentication" "pubkeyauthentication")"
+
+    echo -e "\n${CYAN}========================================${NC}"
+    echo -e "${CYAN}  Hardening Summary${NC}"
+    echo -e "${CYAN}========================================${NC}"
+    echo -e "  Login public key: $([ "$login_key_ready" -eq 1 ] && printf '%bconfirmed%b' "$GREEN" "$NC" || printf '%bnot confirmed%b' "$YELLOW" "$NC")"
+    echo -e "  SSH port step: ${CYAN}${port_status}${NC}"
+    echo -e "  SSH auth step: ${CYAN}${auth_status}${NC}"
+    echo -e "  SSH port(s): ${CYAN}${current_ports_display}${NC}"
+    echo -e "  PermitRootLogin: ${CYAN}${permit_root:-unknown}${NC}"
+    echo -e "  PasswordAuthentication: ${CYAN}${password_auth:-unknown}${NC}"
+    echo -e "  KbdInteractiveAuthentication: ${CYAN}${kbd_auth:-unknown}${NC}"
+    echo -e "  PubkeyAuthentication: ${CYAN}${pubkey_auth:-unknown}${NC}"
+    echo -e "${CYAN}========================================${NC}"
+
+    local overall_rc=0
+    [ "$port_status" = "failed" ] && overall_rc=1
+    [ "$auth_status" = "failed" ] && overall_rc=1
+
+    echo -e "\n${YELLOW}[Reminder] Verify SSH access before closing this session.${NC}"
+    echo -e "  ${CYAN}ssh -p $(printf '%s\n' "$current_ports" | awk 'NF { print; exit }') ${target_user}@host${NC}"
+
+    return "$overall_rc"
 }
 
 # =============================================================================
@@ -937,6 +1807,7 @@ do_install_all() {
     else
         echo -e "${CYAN}Installing: Timezone + Git + Python3 + Node.js + Go + Docker${NC}"
         echo -e "${CYAN}After that, you can choose whether to change the SSH port if it is still 22.${NC}\n"
+        echo -e "${CYAN}Run ${CYAN}bash env.sh harden-server${NC}${CYAN} afterwards to prepare login keys and harden SSH.${NC}\n"
     fi
 
     # Track per-step result (0 = ok, 1 = failed) for the summary.
@@ -1000,6 +1871,7 @@ Commands:
   install-go                  Install the Go toolchain
   install-docker              Install Docker
   ssh-port [port]             Change SSH port on Linux
+  harden-server [port]        Prepare login keys and harden SSH
   help                        Show this help
 EOF
 }
@@ -1020,6 +1892,7 @@ if [ $# -gt 0 ]; then
         install-go)     do_install_go ;;
         install-docker) do_install_docker ;;
         ssh-port)       do_change_ssh_port "${2:-}" ;;
+        harden-server)  do_harden_server "${2:-}" ;;
         *)
             echo -e "${RED}[Error] Unknown command: $1${NC}"
             print_help
@@ -1051,9 +1924,10 @@ echo -e "  ${GREEN}6)${NC} Install Node.js      - install Node.js and npm"
 echo -e "  ${GREEN}7)${NC} Install Go           - install the Go toolchain"
 echo -e "  ${GREEN}8)${NC} Install Docker       - install Docker"
 echo -e "  ${GREEN}9)${NC} Change SSH Port      - update SSH from the default Linux port ${YELLOW}[Linux only]${NC}"
+echo -e "  ${GREEN}10)${NC} Harden Server       - prepare login keys and harden SSH ${YELLOW}[Linux only]${NC}"
 echo -e "  ${RED}0)${NC} Exit"
 echo ""
-tty_read MENU_CHOICE "Enter option (0-9): "
+tty_read MENU_CHOICE "Enter option (0-10): "
 
 case "$MENU_CHOICE" in
     1) do_install_all ;;
@@ -1065,6 +1939,7 @@ case "$MENU_CHOICE" in
     7) do_install_go ;;
     8) do_install_docker ;;
     9) do_change_ssh_port ;;
+    10) do_harden_server ;;
     0|"")
         echo -e "${YELLOW}Exited.${NC}"
         exit 0
